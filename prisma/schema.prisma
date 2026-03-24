@@ -1,0 +1,362 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ------------------------------------------------------
+// 1. ENUMS GLOBALES
+// ------------------------------------------------------
+enum Rol {
+  SUPERADMIN
+  ADMIN
+  ADMINISTRATIVO // Precontractual
+  ABOGADO        // Precontractual
+  AUXILIAR       // APS / Identificaciones
+  PROFESIONAL    // SGA / Atenciones
+  FACTURADOR     // Facturación
+}
+
+enum DerivacionEstado {
+  PENDIENTE
+  EN_PROCESO
+  ATENDIDA
+  RECHAZADA
+}
+
+enum ContratoEstado {
+  SELECCIONADO
+  SUBIENDO_DOCUMENTOS
+  CREANDO_CONTRATO
+  ESPERA_POLIZA
+  ACTA_INICIO
+  ASIGNACION_TERRITORIO
+  ACTIVO
+  FINALIZADO
+}
+
+enum EstadoFacturacion {
+  NO_FACTURABLE
+  PENDIENTE
+  FACTURADA
+  GLOSADA
+  PAGADA
+}
+
+// ------------------------------------------------------
+// 2. MODELO TERRITORIO (FUNDACIONAL MULTI-TENANT)
+// ------------------------------------------------------
+model Territorio {
+  id           String       @id @default(uuid())
+  codigo       String       @unique // Ej. "T01"
+  nombre       String
+  descripcion  String?
+  activo       Boolean      @default(true)
+
+  // Relaciones
+  usuarios     User[]
+  fichas       FichaHogar[]
+  contratos    Contrato[]
+  derivaciones Derivacion[]
+  atenciones   Atencion[]
+}
+
+// ------------------------------------------------------
+// 3. ROLES, USUARIOS Y PROGRAMAS
+// ------------------------------------------------------
+model Programa {
+  id           String       @id @default(uuid())
+  nombre       String       @unique
+  meta         Int?
+  
+  usuarios     User[]
+  atenciones   Atencion[]
+  derivaciones Derivacion[]
+}
+
+model User {
+  id            String   @id @default(uuid())
+  documento     String   @unique
+  email         String   @unique
+  password      String
+  nombre        String
+  apellidos     String
+  rol           Rol      @default(AUXILIAR)
+  activo        Boolean  @default(true)
+  lastLogin     DateTime?
+
+  // Relación Territorial (Opcional, obligatorio lógicamente para Auxiliares/Profesionales en BD)
+  territorioId  String?
+  territorio    Territorio? @relation(fields: [territorioId], references: [id])
+
+  // Relación a Programa (Opcional)
+  programaId    String?
+  programa      Programa?   @relation(fields: [programaId], references: [id])
+
+  // Relaciones sistémicas
+  contratos     Contrato[]
+  fichasCreadas FichaHogar[] 
+  atenciones    Atencion[]   
+  derivacionesRecibidas Derivacion[] @relation("ProfesionalDerivacion") 
+
+  auditoriasContrato EstadoContratoHistorial[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  // Recuperación de contraseña (6 dígitos con expiración)
+  recoveryCode    String?
+  recoveryExpires DateTime?
+}
+
+// ------------------------------------------------------
+// 4. MÓDULO PRECONTRACTUAL
+// ------------------------------------------------------
+model Contrato {
+  id                  String         @id @default(uuid())
+  userId              String         
+  user                User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  territorioId        String?
+  territorio          Territorio?    @relation(fields: [territorioId], references: [id])
+  
+  perfil              String?
+  estado              ContratoEstado @default(SELECCIONADO)
+  
+  numeroContrato      String?        @unique
+  cdp                 String?        @unique
+  rp                  String?        @unique
+  numeroPoliza        String?        @unique
+  
+  fechaRp             DateTime?
+  fechaSello          DateTime?
+  fechaPoliza         DateTime?
+  fechaInicioPoliza   DateTime?
+  fechaFinPoliza      DateTime?
+  aseguradora         String?
+  fechaInicio         DateTime?
+  fechaFinal          DateTime?
+  arl                 String?
+  empresaArl          String?
+  valorPago           Float?
+  porcentajeEjecucion Float?
+  fechaPago           DateTime?
+  objeto              String?
+  
+  historial           EstadoContratoHistorial[]
+  
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @default(now()) @updatedAt
+}
+
+model EstadoContratoHistorial {
+  id               String          @id @default(uuid())
+  contratoId       String
+  contrato         Contrato        @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  
+  estadoAnterior   ContratoEstado?
+  estadoNuevo      ContratoEstado
+  fechaCambio      DateTime        @default(now())
+  observaciones    String?
+  
+  modificadoPorId  String
+  modificadoPor    User            @relation(fields: [modificadoPorId], references: [id])
+}
+
+// ------------------------------------------------------
+// 5. MÓDULO DE IDENTIFICACIONES (APS)
+// ------------------------------------------------------
+model FichaHogar {
+  id                    String   @id @default(uuid())
+  consecutivo           Int      @unique @default(autoincrement())
+  
+  // Encabezado
+  estadoVisita          String
+  observacionesRechazo  String?
+  departamento          String
+  municipio             String
+  
+  territorioId          String?
+  territorio            Territorio? @relation(fields: [territorioId], references: [id])
+  
+  microterritorio       String?
+  uzpe                  String?
+  centroPoblado         String?
+  descripcionUbicacion  String?
+  direccion             String
+  latitud               Float?
+  longitud              Float?
+  fechaDiligenciamiento DateTime @default(now())
+  
+  encuestadorId         String?
+  encuestador           User?      @relation(fields: [encuestadorId], references: [id])
+  numEBS                String?
+  prestadorPrimario     String?
+  numHogar              String?
+  numFamilia            String?
+  codFicha              String?
+  
+  // Vivienda
+  tipoVivienda          Int?
+  tipoViviendaDesc      String?
+  matParedes            Int?
+  matPisos              Int?
+  matTechos             Int?
+  numHogares            Int?
+  numDormitorios        Int?
+  estratoSocial         Int?
+  hacinamiento          Boolean?
+  
+  fuenteAgua            Int[]
+  dispExcretas          Int[]
+  aguasResiduales       Int[]
+  dispResiduos          Int[]
+  riesgoAccidente       Int[]
+  fuenteEnergia         Int?
+  presenciaVectores     Boolean?
+  
+  animales              Int[]
+  cantAnimales          Int?
+  vacunacionMascotas    Boolean?
+  
+  // Familia
+  tipoFamilia           Int?
+  numIntegrantes        Int?
+  apgar                 Int?
+  ecomapa               Int?
+  cuidadorPrincipal     Boolean?
+  zarit                 Int?
+  vulnerabilidades      String[]
+  
+  pacientes             Paciente[]
+  derivaciones          Derivacion[]
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @default(now()) @updatedAt
+}
+
+// ------------------------------------------------------
+// 6. PUENTE Y SGA: PACIENTE, DERIVACIÓN Y ATENCIÓN
+// ------------------------------------------------------
+
+model Paciente {
+  id                String   @id @default(uuid())
+  
+  // Opcional para poder crear pacientes sin ficha (ej. llegan directo al SGA)
+  fichaId           String?
+  ficha             FichaHogar? @relation(fields: [fichaId], references: [id], onDelete: Cascade)
+  
+  nombres           String
+  apellidos         String
+  tipoDoc           String   @default("CC")
+  documento         String   @unique
+  fechaNacimiento   String   
+  sexo              String   @default("HOMBRE")
+  generoIdentidad   String?
+  
+  parentesco        Int      @default(1)
+  gestante          String   @default("NA")
+  mesesGestacion    Int?
+  
+  telefono          String?
+  direccion         String?  // Consolidado
+  nivelEducativo    Int?
+  ocupacion         Int?
+  regimen           String?
+  eapb              String?
+  etnia             Int?
+  puebloIndigena    String?
+  
+  grupoPoblacional  Int[]
+  discapacidades    Int[]
+  
+  // Salud
+  peso              Float?
+  talla             Float?
+  perimetroBraquial Float?
+  diagNutricional   Int?
+  practicaDeportiva Boolean?
+  lactanciaMaterna  Boolean?
+  lactanciaMeses    Int?
+  
+  esquemaAtenciones Boolean?
+  esquemaVacunacion Boolean?
+  intervencionesPendientes Int[]
+  
+  enfermedadAguda   Boolean?
+  recibeAtencionMedica Boolean?
+  remisiones        String[]
+  
+  antecedentes      Json?
+  antecTransmisibles Json?
+  
+  // Relaciones
+  atenciones      Atencion[]
+  derivaciones    Derivacion[] 
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+}
+
+model Derivacion {
+  id              String           @id @default(uuid())
+  
+  fichaId         String?
+  ficha           FichaHogar?      @relation(fields: [fichaId], references: [id])
+  pacienteId      String
+  paciente        Paciente         @relation(fields: [pacienteId], references: [id])
+  
+  territorioId    String?
+  territorio      Territorio?      @relation(fields: [territorioId], references: [id])
+  
+  programaId      String?
+  programa        Programa?        @relation(fields: [programaId], references: [id])
+  profesionalId   String?          
+  profesional     User?            @relation("ProfesionalDerivacion", fields: [profesionalId], references: [id])
+  
+  estado          DerivacionEstado @default(PENDIENTE)
+  notaIdentificacion String?       
+  
+  atencionId      String?          @unique
+  atencion        Atencion?        @relation("DerivacionAtencion", fields: [atencionId], references: [id])
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
+}
+
+model Atencion {
+  id                  String   @id @default(uuid())
+  pacienteId          String
+  paciente            Paciente @relation(fields: [pacienteId], references: [id])
+  
+  profesionalId       String
+  profesional         User     @relation(fields: [profesionalId], references: [id])
+  
+  programaId          String
+  programa            Programa @relation(fields: [programaId], references: [id])
+  
+  territorioId        String?
+  territorio          Territorio? @relation(fields: [territorioId], references: [id])
+  
+  nota                String   
+  
+  derivacion          Derivacion? @relation("DerivacionAtencion")
+
+  estadoFacturacion   EstadoFacturacion @default(PENDIENTE)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @default(now()) @updatedAt
+}
+
+// ------------------------------------------------------
+// 7. CONFIGURACIÓN DEL SISTEMA
+// ------------------------------------------------------
+model SystemSettings {
+  id                String   @id @default(uuid())
+  currentStageStart DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+}
