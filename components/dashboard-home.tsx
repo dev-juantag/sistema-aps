@@ -362,17 +362,17 @@ export function DashboardHome() {
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
               <Baby className="mx-auto h-8 w-8 text-chart-2 mb-2" />
-              <p className="text-3xl font-bold text-foreground">{idStats.kpis.menores5}</p>
+              <p className="text-3xl font-bold text-foreground">{idStats?.kpis?.menores5 || 0}</p>
               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Primera Infancia (&lt;5 Años)</p>
             </div>
             <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
               <Activity className="mx-auto h-8 w-8 text-destructive mb-2" />
-              <p className="text-3xl font-bold text-foreground">{idStats.kpis.gestantes}</p>
+              <p className="text-3xl font-bold text-foreground">{idStats?.kpis?.gestantes || 0}</p>
               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Gestantes Activas</p>
             </div>
             <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
               <Users className="mx-auto h-8 w-8 text-chart-4 mb-2" />
-              <p className="text-3xl font-bold text-foreground">{idStats.kpis.mayores60}</p>
+              <p className="text-3xl font-bold text-foreground">{idStats?.kpis?.mayores60 || 0}</p>
               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Adultos Mayores (60+ Años)</p>
             </div>
           </div>
@@ -387,9 +387,9 @@ export function DashboardHome() {
                 </h2>
               </div>
               <div className="w-full h-[300px]">
-                {idStats.piramide.length > 0 ? (
+                {(idStats?.piramide?.length || 0) > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart layout="vertical" data={idStats.piramide} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+                    <BarChart layout="vertical" data={idStats?.piramide || []} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="oklch(0.9 0.02 285)" />
                       <XAxis type="number" />
                       <YAxis dataKey="label" type="category" width={80} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} />
@@ -422,7 +422,7 @@ export function DashboardHome() {
                 </div>
               </div>
               <div className="w-full h-[300px]">
-                {idStats.densidad.length > 0 ? (
+                {(idStats?.densidad?.length || 0) > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.9 0.02 285)" />
@@ -444,7 +444,7 @@ export function DashboardHome() {
                           return null
                         }}
                       />
-                      <Scatter name="Territorios" data={idStats.densidad} fill="oklch(0.65 0.15 calc(var(--brand-hue) - 85))" />
+                      <Scatter name="Territorios" data={idStats?.densidad || []} fill="oklch(0.65 0.15 calc(var(--brand-hue) - 85))" />
                     </ScatterChart>
                   </ResponsiveContainer>
                 ) : (

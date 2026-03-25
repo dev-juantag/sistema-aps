@@ -146,7 +146,7 @@ export async function GET(request: Request) {
       })
 
       // Barreras
-      p.barrerasAcceso?.forEach(id => {
+      p.barrerasAcceso?.forEach((id: number) => {
         barrerasMap[id] = (barrerasMap[id] || 0) + 1
       })
 

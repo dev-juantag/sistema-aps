@@ -101,7 +101,7 @@ export function AdminReportesId() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={stats.aseguramiento.regimen}
+                      data={stats?.aseguramiento?.regimen || []}
                       innerRadius={60}
                       outerRadius={100}
                       paddingAngle={5}
@@ -122,7 +122,7 @@ export function AdminReportesId() {
           <ChartContainer className="lg:col-span-2" title="Principales EAPB / EPS en el Territorio" icon={<Stethoscope className="w-4 h-4" />}>
             <div className="h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.aseguramiento.eapb} margin={{ bottom: 40 }}>
+                <BarChart data={stats?.aseguramiento?.eapb || []} margin={{ bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} fontSize={10} height={80} />
                   <YAxis />
@@ -141,7 +141,7 @@ export function AdminReportesId() {
           <ChartContainer title="Estado Nutricional" icon={<Scale className="w-4 h-4" />}>
              <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.nutricion.map((n:any) => ({
+                  <BarChart data={(stats?.nutricion || []).map((n:any) => ({
                     name: DIAGNOSTICO_NUTRICIONAL.find(d => String(d.id) === n.name)?.label || 'No aplica',
                     value: n.value
                   }))}>
@@ -159,7 +159,7 @@ export function AdminReportesId() {
           <ChartContainer title="Enfermedades Crónicas Prevalentes" icon={<AlertTriangle className="w-4 h-4" />}>
              <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.morbilidad.cronicas.map((n:any) => ({
+                  <BarChart data={(stats?.morbilidad?.cronicas || []).map((n:any) => ({
                     name: ANTECEDENTES_CRONICOS.find(d => d.id === n.name)?.label || n.name,
                     value: n.value
                   }))} layout="vertical">
@@ -178,8 +178,8 @@ export function AdminReportesId() {
              <div className="text-sm">
                 <p className="font-bold text-[#081e69]">Indicador de Morbilidad Aguda</p>
                 <p className="text-muted-foreground mt-1">
-                  Se han identificado <b>{kpis.enfermedadAguda}</b> casos de enfermedad aguda reciente (IRAS/EDAS). 
-                  De estos, el <b>{Math.round((kpis.recibeAtencion / (kpis.enfermedadAguda || 1)) * 100)}%</b> está recibiendo atención médica.
+                  Se han identificado <b>{kpis.enfermedadAguda || 0}</b> casos de enfermedad aguda reciente (IRAS/EDAS). 
+                  De estos, el <b>{Math.round(((kpis.recibeAtencion || 0) / (kpis.enfermedadAguda || 1)) * 100)}%</b> está recibiendo atención médica.
                 </p>
              </div>
           </div>
@@ -192,7 +192,7 @@ export function AdminReportesId() {
           <ChartContainer title="Brechas en Resalución 3280 (Intervenciones Pendientes)" icon={<AlertTriangle className="w-4 h-4" />}>
              <div className="h-[400px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.intervenciones.map((n:any) => ({
+                  <BarChart data={(stats?.intervenciones || []).map((n:any) => ({
                     name: INTERVENCIONES_PENDIENTES.find(d => String(d.id) === n.name)?.label || n.name,
                     value: n.value
                   }))} layout="vertical">
@@ -210,7 +210,7 @@ export function AdminReportesId() {
           <ChartContainer title="Barreras de Acceso Reportadas" icon={<AlertTriangle className="w-4 h-4" />}>
              <div className="h-[400px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.barreras.map((n:any) => ({
+                  <BarChart data={(stats?.barreras || []).map((n:any) => ({
                     name: BARRERAS_ACCESO.find(d => String(d.id) === n.name)?.label || n.name,
                     value: n.value
                   }))} layout="vertical">
