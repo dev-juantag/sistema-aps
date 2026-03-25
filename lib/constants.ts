@@ -365,15 +365,21 @@ export const INTERVENCIONES_PENDIENTES = [
   { id: 10, label: 'Atención en salud oral' },
 ]
 
+export const BARRERAS_ACCESO = [
+  { id: 1, label: 'Lugar lejano / Difícil acceso' },
+  { id: 2, label: 'Barreras de horario' },
+  { id: 3, label: 'Desconocimiento de servicios' },
+  { id: 4, label: 'Falta de tecnología / Conectividad' },
+  { id: 5, label: 'Costo del transporte' },
+  { id: 6, label: 'Trámites administrativos complejos' },
+  { id: 7, label: 'Mal servicio / Desconfianza' },
+  { id: 8, label: 'Ninguna' },
+]
+
 export const REMISIONES_APS = [
   { id: 'psicologia', label: 'Psicología' },
   { id: 'odontologia', label: 'Odontología' },
   { id: 'medicina', label: 'Medicina General' },
-  { id: 'enfermeria', label: 'Enfermería' },
-  { id: 'trabajo_social', label: 'Trabajo Social' },
-  { id: 'nutricion', label: 'Nutrición y Dietética' },
-  { id: 'fisioterapia', label: 'Fisioterapia' },
-  { id: 'optometria', label: 'Optometría' },
 ]
 
 export const DIAGNOSTICO_NUTRICIONAL = [

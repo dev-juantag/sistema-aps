@@ -86,6 +86,14 @@ export async function DELETE(
 
     const user = await prisma.user.findUnique({
       where: { id },
+      include: {
+        _count: {
+          select: {
+            atenciones: true,
+            fichasCreadas: true
+          }
+        }
+      }
     })
 
     console.log("Usuario encontrado:", user)
@@ -97,10 +105,26 @@ export async function DELETE(
       )
     }
 
-    if ((user.rol as string) === "SUPERADMIN") {
+    const rol = (user.rol as string).toUpperCase()
+
+    if (rol === "SUPERADMIN") {
       return NextResponse.json(
         { error: "No se puede eliminar a un Super Administrador" },
         { status: 403 }
+      )
+    }
+
+    if (rol === "PROFESIONAL" && user._count.atenciones > 0) {
+      return NextResponse.json(
+        { error: "No se puede eliminar el usuario profesional porque tiene atenciones asociadas." },
+        { status: 400 }
+      )
+    }
+
+    if (rol === "AUXILIAR" && user._count.fichasCreadas > 0) {
+      return NextResponse.json(
+        { error: "No se puede eliminar el usuario auxiliar porque tiene identificaciones (fichas) creadas." },
+        { status: 400 }
       )
     }
 
@@ -113,7 +137,7 @@ export async function DELETE(
     console.error("DELETE ERROR:", error)
     if (error.code === 'P2003') {
       return NextResponse.json(
-        { error: "No se puede eliminar el usuario porque tiene atenciones asociadas." },
+        { error: "No se puede eliminar el usuario porque tiene registros dependientes asociados." },
         { status: 400 }
       )
     }

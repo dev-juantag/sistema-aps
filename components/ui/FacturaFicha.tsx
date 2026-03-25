@@ -2,8 +2,9 @@ import {
   ESTADO_VISITA, TIPO_VIVIENDA, MATERIAL_PAREDES, MATERIAL_PISOS, MATERIAL_TECHOS,
   FUENTE_AGUA, DISPOSICION_EXCRETAS, AGUAS_RESIDUALES, DISPOSICION_RESIDUOS, RIESGO_ACCIDENTE,
   FUENTE_ENERGIA, ANIMALES, TIPO_FAMILIA, APGAR_OPCIONES, ZARIT_OPCIONES, ECOMAPA_OPCIONES,
-  VULNERABILIDADES, DIAGNOSTICO_NUTRICIONAL
+  VULNERABILIDADES, DIAGNOSTICO_NUTRICIONAL, PARENTESCO, REGIMEN_SALUD, OCUPACION
 } from '@/lib/constants'
+import FamiliogramaViewer from './FamiliogramaViewer'
 
 export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha: any, autoPrint?: boolean, showOnScreen?: boolean }) {
   if (!ficha) return null
@@ -47,173 +48,190 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
   return (
     <div className={`${showOnScreen ? 'block' : 'hidden print:block'} font-sans text-black bg-white w-full max-w-none mx-auto p-4 md:p-8 leading-normal print:p-0`}>
       
-      {/* ========================================================= */}
-      {/* PÁGINA 1: INFORMACIÓN GENERAL Y UBICACIÓN                 */}
-      {/* ========================================================= */}
-      <div className={sectionCls} style={{ pageBreakAfter: 'always' }}>
-        <div className="text-center mb-8 pb-4" style={{ borderBottom: '4px solid black' }}>
+      {/* HEADER GLOBAL */}
+      <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: '4px solid black' }}>
+        <img src="/logo-gobernacion-risaralda.png" alt="Logo 1" className="w-24 h-24 border border-gray-50 bg-gray-50 shrink-0" />
+        <div className="text-center px-4 flex-1">
           <h1 className="font-black text-3xl uppercase tracking-widest">Identificación APS</h1>
           <p className="font-bold text-lg mt-2 tracking-widest text-gray-600">FICHA OFICIAL NO. {ficha.consecutivo || ficha.id?.substring(0,8)}</p>
           <p className="mt-1 font-mono text-sm text-gray-500">Documento impreso el {new Date().toLocaleString('es-CO')}</p>
         </div>
-
-        <h2 className={headerCls}>1. Control y Responsables</h2>
-        <table className={tblCls}>
-          <tbody>
-            <tr><Th>Estado de la Visita</Th><Td><span className="font-bold uppercase bg-gray-200 px-2 py-1 rounded">{getLabel(ESTADO_VISITA, ficha.estadoVisita)}</span></Td></tr>
-            <tr><Th>Fecha de Diligenciamiento</Th><Td>{new Date(ficha.fechaDiligenciamiento).toLocaleString('es-CO')}</Td></tr>
-            <tr><Th>Prestador Primario</Th><Td>{ficha.prestadorPrimario || 'N/A'}</Td></tr>
-            <tr><Th>Código EBS (No. Identificación)</Th><Td>{ficha.numEBS || 'N/A'}</Td></tr>
-            <tr><Th>Responsable / Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.nombre} ${ficha.encuestador.apellidos}` : ficha.perfilEncuestador}</Td></tr>
-            <tr><Th>Doc. Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.documento}` : ficha.numDocEncuestador}</Td></tr>
-          </tbody>
-        </table>
-
-        <h2 className={headerCls}>2. Códigos de Identificación</h2>
-        <table className={tblCls}>
-          <tbody>
-            <tr><Th>Código de Ficha Física</Th><Td>{ficha.codFicha || 'N/A'}</Td></tr>
-            <tr><Th>Código / Número de Hogar</Th><Td className="font-mono">{ficha.numHogar || 'N/A'}</Td></tr>
-            <tr><Th>Código / Número de Familia</Th><Td className="font-mono">{ficha.numFamilia || 'N/A'}</Td></tr>
-            <tr><Th>Código UZPE</Th><Td>{ficha.uzpe || 'N/A'}</Td></tr>
-          </tbody>
-        </table>
-
-        <h2 className={headerCls}>3. Ubicación y Georreferenciación</h2>
-        <table className={tblCls}>
-          <tbody>
-            <tr><Th>Departamento</Th><Td>{ficha.departamento}</Td></tr>
-            <tr><Th>Municipio</Th><Td>{ficha.municipio}</Td></tr>
-            <tr><Th>Territorio / Micro</Th><Td>{ficha.territorio} / {ficha.microterritorio}</Td></tr>
-            <tr><Th>Clase de Centro Poblado</Th><Td>{ficha.centroPoblado || 'N/A'}</Td></tr>
-            <tr><Th>Dirección</Th><Td>{ficha.direccion}</Td></tr>
-            <tr><Th>Descripción de Ubicación</Th><Td>{ficha.descripcionUbicacion || 'N/A'}</Td></tr>
-            <tr><Th>Georreferenciación (GPS)</Th><Td className="font-mono text-xs">{(ficha.latitud != null && ficha.longitud != null) ? `Lat: ${ficha.latitud}, Lng: ${ficha.longitud}` : 'Sin coordenadas registradas'}</Td></tr>
-          </tbody>
-        </table>
+        <img src="/logo-gobernacion-risaralda.png" alt="Logo 2" className="w-24 h-24 border border-gray-50 bg-gray-50 shrink-0" />
       </div>
 
-
-      {/* ========================================================= */}
-      {/* PÁGINA 2: VIVIENDA, SANEAMIENTO Y ENTORNO                 */}
-      {/* ========================================================= */}
-      {ficha.estadoVisita === '1' && (
-      <div className={sectionCls} style={{ pageBreakAfter: 'always' }}>
-        <h2 className={headerCls}>4. Características Físicas de la Vivienda</h2>
-        <table className={tblCls}>
-          <tbody>
-            <tr><Th>Tipo de Vivienda</Th><Td>{getLabel(TIPO_VIVIENDA, ficha.tipoVivienda)}{ficha.tipoViviendaDesc ? ` - ${ficha.tipoViviendaDesc}` : ''}</Td></tr>
-            <tr><Th>Material de Paredes</Th><Td>{getLabel(MATERIAL_PAREDES, ficha.matParedes)}</Td></tr>
-            <tr><Th>Material de Pisos</Th><Td>{getLabel(MATERIAL_PISOS, ficha.matPisos)}</Td></tr>
-            <tr><Th>Material de Techos</Th><Td>{getLabel(MATERIAL_TECHOS, ficha.matTechos)}</Td></tr>
-            <tr><Th>Total Hogares en Vivienda</Th><Td>{ficha.numHogares || 1}</Td></tr>
-            <tr><Th>Dormitorios Exclusivos</Th><Td>{ficha.numDormitorios || 0}</Td></tr>
-            <tr><Th>Estrato Social</Th><Td>{ficha.estratoSocial || 'N/A'}</Td></tr>
-            <tr><Th>Hacinamiento Habitacional</Th><Td>{ficha.hacinamiento ? 'Sí (Crítico)' : 'No'}</Td></tr>
-            <tr><Th>Fuente de Energía Principal</Th><Td>{getLabel(FUENTE_ENERGIA, ficha.fuenteEnergia)}</Td></tr>
-          </tbody>
-        </table>
-
-        <h2 className={headerCls}>5. Saneamiento Básico</h2>
-        <table className={tblCls}>
-          <tbody>
-            <tr><Th>Fuente de Agua</Th><Td>{getLabels(FUENTE_AGUA, ficha.fuenteAgua)}</Td></tr>
-            <tr><Th>Servicio Sanitario / Excretas</Th><Td>{getLabels(DISPOSICION_EXCRETAS, ficha.dispExcretas)}</Td></tr>
-            <tr><Th>Disposición Aguas Residuales</Th><Td>{getLabels(AGUAS_RESIDUALES, ficha.aguasResiduales)}</Td></tr>
-            <tr><Th>Disposición Residuos Sólidos</Th><Td>{getLabels(DISPOSICION_RESIDUOS, ficha.dispResiduos)}</Td></tr>
-            <tr><Th>Riesgos en la Vivienda</Th><Td>{getLabels(RIESGO_ACCIDENTE, ficha.riesgoAccidente)}</Td></tr>
-          </tbody>
-        </table>
-
-        <h2 className={headerCls}>6. Zoonosis y Vectores</h2>
-        <table className={tblCls}>
-          <tbody>
-            <tr><Th>Presencia de Vectores (Plagas)</Th><Td>{ficha.presenciaVectores ? 'Sí, detectado en el entorno' : 'No reportado'}</Td></tr>
-            <tr><Th>Convive con Animales</Th><Td>{getLabels(ANIMALES, ficha.animales)}</Td></tr>
-            {ficha.cantAnimales > 0 && (
-              <>
-                <tr><Th>Cantidad de Animales</Th><Td>{ficha.cantAnimales}</Td></tr>
-                <tr><Th>Vacunación de Mascotas</Th><Td>{ficha.vacunacionMascotas ? 'Esquema completo / Vigente' : 'Incompleto / No reportado'}</Td></tr>
-              </>
-            )}
-          </tbody>
-        </table>
-      </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* PÁGINA 3: ESTRUCTURA FAMILIAR Y RIESGO PSICOSOCIAL        */}
-      {/* ========================================================= */}
-      {ficha.estadoVisita === '1' && (
-      <div className={sectionCls} style={{ pageBreakAfter: 'always' }}>
-        <h2 className={headerCls}>7. Dinámica y Estructura Familiar</h2>
-        <table className={tblCls}>
-          <tbody>
-            <tr><Th>Tipo de Familia</Th><Td>{getLabel(TIPO_FAMILIA, ficha.tipoFamilia)}</Td></tr>
-            <tr><Th>Cuidador Principal Presente</Th><Td>{ficha.cuidadorPrincipal ? 'Sí, hay una persona dedicada al cuidado familiar' : 'No'}</Td></tr>
-            <tr><Th>Riesgo Psicosocial (Vulnerabilidades)</Th><Td>{getLabels(VULNERABILIDADES, ficha.vulnerabilidades)}</Td></tr>
-          </tbody>
-        </table>
-
-        <h2 className={headerCls}>8. Instrumentos de Evaluación Familiar</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
-          <div className="p-4 border-2 border-slate-300 rounded">
-            <h3 className="font-black mb-2 flex items-center justify-between">
-              APGAR Familiar 
-              <span className="bg-slate-800 text-white px-2 py-1 rounded text-xs">{ficha.apgar ? `${ficha.apgar} pts` : 'No medido'}</span>
-            </h3>
-            <p className="text-lg font-bold text-gray-700">{getLabel(APGAR_OPCIONES, ficha.apgar)}</p>
-            <p className="text-xs text-gray-500 mt-2">Mide de manera rápida la funcionalidad y la satisfacción familiar (apoyo, comunicación, afecto).</p>
+      {/* CASO A: FICHA RECHAZADA O NO EFECTIVA (VERSIÓN CORTA) */}
+      {ficha.estadoVisita !== '1' ? (
+        <div className="space-y-8">
+          <div>
+            <h2 className={headerCls}>1. Control y Responsables</h2>
+            <table className={tblCls}>
+              <tbody>
+                <tr><Th>Estado de la Visita</Th><Td><span className="font-bold uppercase bg-gray-200 px-2 py-1 rounded">{getLabel(ESTADO_VISITA, ficha.estadoVisita)}</span></Td></tr>
+                <tr><Th>Fecha de Diligenciamiento</Th><Td>{new Date(ficha.fechaDiligenciamiento).toLocaleString('es-CO')}</Td></tr>
+                <tr>< Th>Responsable / Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.nombre} ${ficha.encuestador.apellidos}` : ficha.perfilEncuestador}</Td></tr>
+                <tr><Th>Doc. Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.documento}` : ficha.numDocEncuestador}</Td></tr>
+              </tbody>
+            </table>
           </div>
 
-          <div className="p-4 border-2 border-slate-300 rounded">
-            <h3 className="font-black mb-2 flex items-center justify-between">
-              Escala de ZARIT (Cuidador)
-              <span className="bg-slate-800 text-white px-2 py-1 rounded text-xs">{ficha.zarit ? `${ficha.zarit} pts` : 'No aplica'}</span>
-            </h3>
-            <p className="text-lg font-bold text-gray-700">{getLabel(ZARIT_OPCIONES, ficha.zarit)}</p>
-            <p className="text-xs text-gray-500 mt-2">Evalúa la sobrecarga o nivel de estrés del cuidador principal dentro del hogar.</p>
+          <div>
+            <h2 className={headerCls}>2. Ubicación y Georreferenciación</h2>
+            <table className={tblCls}>
+              <tbody>
+                <tr><Th>Municipio</Th><Td>{ficha.municipio}</Td></tr>
+                <tr><Th>Territorio / Micro</Th><Td>{typeof ficha.territorio === 'object' && ficha.territorio ? `${ficha.territorio.codigo} | ${ficha.territorio.nombre}` : (ficha.territorio || ficha.territorioId)} / {ficha.microterritorio}</Td></tr>
+                <tr><Th>Dirección</Th><Td>{ficha.direccion}</Td></tr>
+                <tr><Th>GPS</Th><Td className="font-mono text-xs">{(ficha.latitud != null && ficha.longitud != null) ? `Lat: ${ficha.latitud}, Lng: ${ficha.longitud}` : 'Sin coordenadas'}</Td></tr>
+              </tbody>
+            </table>
           </div>
 
-          <div className="col-span-2 p-4 border-2 border-slate-300 rounded">
-            <h3 className="font-black mb-2 flex items-center justify-between">
-              Ecomapa Familiar y Redes de Apoyo
-            </h3>
-            <p className="text-lg font-bold text-gray-700">{getLabel(ECOMAPA_OPCIONES, ficha.ecomapa)}</p>
-            <p className="text-xs text-gray-500 mt-2">Nivel de interacción de la familia con sistemas externos (salud, educación, comunidad).</p>
+          <div className="p-6 border-4 border-black rounded-xl">
+             <h2 className="font-black text-lg uppercase mb-2">3. Motivo de No Efectividad / Rechazo</h2>
+             <p className="text-xl font-bold italic">
+               &quot;{ficha.observacionesRechazo || 'No se registraron observaciones adicionales por parte del encuestador.'}&quot;
+             </p>
           </div>
         </div>
-      </div>
-      )}
-
-
-      {/* ========================================================= */}
-      {/* PÁGINA 4+: CENSOS Y DATOS DE SALUD (INTEGRANTES)          */}
-      {/* ========================================================= */}
-      {ficha.estadoVisita === '1' && (
+      ) : (
+        /* CASO B: FICHA EFECTIVA (VERSIÓN COMPLETA) */
         <>
+          <div className={sectionCls} style={{ pageBreakAfter: 'always' }}>
+            <h2 className={headerCls}>1. Control y Responsables</h2>
+            <table className={tblCls}>
+              <tbody>
+                <tr><Th>Estado de la Visita</Th><Td><span className="font-bold uppercase bg-gray-200 px-2 py-1 rounded">{getLabel(ESTADO_VISITA, ficha.estadoVisita)}</span></Td></tr>
+                <tr><Th>Fecha de Diligenciamiento</Th><Td>{new Date(ficha.fechaDiligenciamiento).toLocaleString('es-CO')}</Td></tr>
+                <tr><Th>Prestador Primario</Th><Td>{ficha.prestadorPrimario || 'N/A'}</Td></tr>
+                <tr><Th>Código EBS (No. Identificación)</Th><Td>{ficha.numEBS || 'N/A'}</Td></tr>
+                <tr><Th>Responsable / Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.nombre} ${ficha.encuestador.apellidos}` : ficha.perfilEncuestador}</Td></tr>
+                <tr><Th>Doc. Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.documento}` : ficha.numDocEncuestador}</Td></tr>
+              </tbody>
+            </table>
+
+            <h2 className={headerCls}>2. Códigos de Identificación</h2>
+            <table className={tblCls}>
+              <tbody>
+                <tr><Th>Código de Ficha Física</Th><Td>{ficha.codFicha || 'N/A'}</Td></tr>
+                <tr><Th>Código / Número de Hogar</Th><Td className="font-mono">{ficha.numHogar || 'N/A'}</Td></tr>
+                <tr><Th>Código / Número de Familia</Th><Td className="font-mono">{ficha.numFamilia || 'N/A'}</Td></tr>
+                <tr><Th>Código UZPE</Th><Td>{ficha.uzpe || 'N/A'}</Td></tr>
+              </tbody>
+            </table>
+
+            <h2 className={headerCls}>3. Ubicación y Georreferenciación</h2>
+            <table className={tblCls}>
+              <tbody>
+                <tr><Th>Departamento</Th><Td>{ficha.departamento}</Td></tr>
+                <tr><Th>Municipio</Th><Td>{ficha.municipio}</Td></tr>
+                <tr><Th>Territorio / Micro</Th><Td>{typeof ficha.territorio === 'object' && ficha.territorio ? `${ficha.territorio.codigo} | ${ficha.territorio.nombre}` : (ficha.territorio || ficha.territorioId)} / {ficha.microterritorio}</Td></tr>
+                <tr><Th>Clase de Centro Poblado</Th><Td>{ficha.centroPoblado || 'N/A'}</Td></tr>
+                <tr><Th>Dirección</Th><Td>{ficha.direccion}</Td></tr>
+                <tr><Th>Descripción de Ubicación</Th><Td>{ficha.descripcionUbicacion || 'N/A'}</Td></tr>
+                <tr><Th>Georreferenciación (GPS)</Th><Td className="font-mono text-xs">{(ficha.latitud != null && ficha.longitud != null) ? `Lat: ${ficha.latitud}, Lng: ${ficha.longitud}` : 'Sin coordenadas registradas'}</Td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className={sectionCls} style={{ pageBreakAfter: 'always' }}>
+            <h2 className={headerCls}>4. Características Físicas de la Vivienda</h2>
+            <table className={tblCls}>
+              <tbody>
+                <tr><Th>Tipo de Vivienda</Th><Td>{getLabel(TIPO_VIVIENDA, ficha.tipoVivienda)}{ficha.tipoViviendaDesc ? ` - ${ficha.tipoViviendaDesc}` : ''}</Td></tr>
+                <tr><Th>Material de Paredes</Th><Td>{getLabel(MATERIAL_PAREDES, ficha.matParedes)}</Td></tr>
+                <tr><Th>Material de Pisos</Th><Td>{getLabel(MATERIAL_PISOS, ficha.matPisos)}</Td></tr>
+                <tr><Th>Material de Techos</Th><Td>{getLabel(MATERIAL_TECHOS, ficha.matTechos)}</Td></tr>
+                <tr><Th>Total Hogares en Vivienda</Th><Td>{ficha.numHogares || 1}</Td></tr>
+                <tr><Th>Dormitorios Exclusivos</Th><Td>{ficha.numDormitorios || 0}</Td></tr>
+                <tr><Th>Estrato Social</Th><Td>{ficha.estratoSocial || 'N/A'}</Td></tr>
+                <tr><Th>Hacinamiento Habitacional</Th><Td>{ficha.hacinamiento ? 'Sí (Crítico)' : 'No'}</Td></tr>
+                <tr><Th>Fuente de Energía Principal</Th><Td>{getLabel(FUENTE_ENERGIA, ficha.fuenteEnergia)}</Td></tr>
+              </tbody>
+            </table>
+
+            <h2 className={headerCls}>5. Saneamiento Básico</h2>
+            <table className={tblCls}>
+              <tbody>
+                <tr><Th>Fuente de Agua</Th><Td>{getLabels(FUENTE_AGUA, ficha.fuenteAgua)}</Td></tr>
+                <tr><Th>Servicio Sanitario / Excretas</Th><Td>{getLabels(DISPOSICION_EXCRETAS, ficha.dispExcretas)}</Td></tr>
+                <tr><Th>Disposición Aguas Residuales</Th><Td>{getLabels(AGUAS_RESIDUALES, ficha.aguasResiduales)}</Td></tr>
+                <tr><Th>Recolección de Residuos</Th><Td>{getLabels(DISPOSICION_RESIDUOS, ficha.dispResiduos)}</Td></tr>
+                <tr><Th>Riesgos en la Vivienda</Th><Td>{getLabels(RIESGO_ACCIDENTE, ficha.riesgoAccidente)}</Td></tr>
+                <tr><Th>Presencia de Vectores</Th><Td>{ficha.presenciaVectores ? 'Identificada' : 'No identificada'}</Td></tr>
+                <tr><Th>Tenencia de Mascotas</Th><Td>{getLabels(ANIMALES, ficha.animales)} (Total: {ficha.cantAnimales || 0})</Td></tr>
+                {(ficha.cantAnimales > 0) && (
+                  <tr><Th>Vacunación de Mascotas</Th><Td>{ficha.vacunacionMascotas ? 'Al día' : 'Pendiente / No informa'}</Td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className={sectionCls} style={{ pageBreakAfter: 'always' }}>
+            <h2 className={headerCls}>6. Composición y Dinámica Familiar</h2>
+            <table className={tblCls}>
+              <tbody>
+                <tr><Th>Tipo de Familia</Th><Td>{getLabel(TIPO_FAMILIA, ficha.tipoFamilia)}</Td></tr>
+                <tr><Th>Número de Integrantes</Th><Td>{ficha.numIntegrantes || 0}</Td></tr>
+              </tbody>
+            </table>
+
+            <h2 className={headerCls}>7. Funcionamiento Familiar (Apgar)</h2>
+            <table className={tblCls}>
+              <tbody>
+                <tr><Th>Nivel de satisfacción (Apgar)</Th><Td className="font-bold">{getLabel(APGAR_OPCIONES, ficha.apgar)}</Td></tr>
+              </tbody>
+            </table>
+
+            <h2 className={headerCls}>8. Carga del Cuidador (Zarit)</h2>
+            <table className={tblCls}>
+              <tbody>
+                <tr><Th>Cuidador Principal en Casa</Th><Td>{ficha.cuidadorPrincipal ? 'Sí' : 'No'}</Td></tr>
+                {ficha.cuidadorPrincipal && (
+                  <tr><Th>Nivel de Sobrecarga (Zarit)</Th><Td className="font-bold">{getLabel(ZARIT_OPCIONES, ficha.zarit)}</Td></tr>
+                )}
+              </tbody>
+            </table>
+
+            <div className="col-span-2 p-4 border-2 border-slate-300 rounded">
+              <h3 className="font-black mb-2 flex items-center justify-between">
+                Ecomapa Familiar y Redes de Apoyo
+              </h3>
+              <p className="text-lg font-bold text-gray-700">{getLabel(ECOMAPA_OPCIONES, ficha.ecomapa)}</p>
+              <p className="text-xs text-gray-500 mt-2">Nivel de interacción de la familia con sistemas externos (salud, educación, comunidad).</p>
+            </div>
+            
+            {ficha.familiogramaCodigo && (
+              <div className="mt-6 mb-6 page-break-inside-avoid">
+                <h2 className={headerCls}>9. Familiograma Autogenerado</h2>
+                <div className="border border-slate-300 rounded overflow-hidden">
+                  <FamiliogramaViewer code={ficha.familiogramaCodigo} />
+                </div>
+              </div>
+            )}
+          </div>
+
           {integranteChunks.length > 0 ? (
             integranteChunks.map((chunk, chunkIdx) => (
               <div key={chunkIdx} className={chunkIdx < integranteChunks.length - 1 ? sectionCls : "mb-8"} style={chunkIdx < integranteChunks.length - 1 ? { pageBreakAfter: 'always' } : {}}>
-                {chunkIdx === 0 && <h2 className={headerCls}>9. Censo e Información de Integrantes</h2>}
-                
+                {chunkIdx === 0 && <h2 className={headerCls}>10. Censo e Información de Integrantes</h2>}
                 {chunk.map((int: any, intIdx: number) => {
                   const globalIdx = chunkIdx * 3 + intIdx + 1;
                   return (
-                    <div key={int.id || intIdx} className="mb-8" style={{ pageBreakInside: 'avoid' }}>
-                      <h3 className={subHeaderCls}>
-                        Integrante {globalIdx}: {int.primerNombre} {int.segundoNombre || ''} {int.primerApellido} {int.segundoApellido || ''}
-                      </h3>
-                      
-                      <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                    <div key={int.id || intIdx} className="mb-8 border-b-2 border-dashed border-gray-400 pb-4 last:border-0 page-break-inside-avoid">
+                      <div className="flex items-center gap-2 mb-3">
+                         <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-sm">#{globalIdx}</div>
+                         <h3 className="font-black text-base uppercase">{int.primerNombre} {int.primerApellido} {int.segundoApellido}</h3>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-x-8">
                         <table className="w-full text-left text-sm border-collapse">
                           <tbody>
-                            <tr><th className="font-bold py-1 w-2/5 border-b border-gray-100">Documento:</th><td className="py-1 border-b border-gray-100 uppercase">{int.tipoDoc} {int.numDoc}</td></tr>
+                            <tr><th className="font-bold py-1 w-2/5 border-b border-gray-100">Documento:</th><td className="py-1 border-b border-gray-100 uppercase">{int.tipoDoc} {int.documento || int.numDoc}</td></tr>
                             <tr><th className="font-bold py-1 border-b border-gray-100">Nacimiento:</th><td className="py-1 border-b border-gray-100">{int.fechaNacimiento} ({calculateAge(int.fechaNacimiento)} años)</td></tr>
                             <tr><th className="font-bold py-1 border-b border-gray-100">Sexo:</th><td className="py-1 border-b border-gray-100 uppercase">{int.sexo}</td></tr>
-                            <tr><th className="font-bold py-1 border-b border-gray-100">Parentesco:</th><td className="py-1 border-b border-gray-100 uppercase">Código {int.parentesco}</td></tr>
-                            <tr><th className="font-bold py-1 border-b border-gray-100">Teléfono:</th><td className="py-1 border-b border-gray-100">{int.telefono || 'N/A'}</td></tr>
-                            <tr><th className="font-bold py-1 border-b border-gray-100">Régimen / EAPB:</th><td className="py-1 border-b border-gray-100 uppercase">{int.regimen || 'NO AFILIADO'} / {int.eapb || '-'}</td></tr>
+                            <tr><th className="font-bold py-1 border-b border-gray-100">Parentesco:</th><td className="py-1 border-b border-gray-100 uppercase">{getLabel(PARENTESCO, int.parentesco)}</td></tr>
+                            <tr><th className="font-bold py-1 border-b border-gray-100">Régimen / EAPB:</th><td className="py-1 border-b border-gray-100 uppercase">{getLabel(REGIMEN_SALUD, int.regimen)} / {int.eapb || '-'}</td></tr>
+                            <tr><th className="font-bold py-1 border-b border-gray-100">Ocupación:</th><td className="py-1 border-b border-gray-100 uppercase">{getLabel(OCUPACION, int.ocupacion)}</td></tr>
                           </tbody>
                         </table>
 
@@ -224,10 +242,42 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
                             <tr><th className="font-bold py-1 border-b border-gray-100">Diag. Nutricional:</th><td className="py-1 border-b border-gray-100">{getLabel(DIAGNOSTICO_NUTRICIONAL, int.diagNutricional)}</td></tr>
                             <tr><th className="font-bold py-1 border-b border-gray-100">Gestante:</th><td className="py-1 border-b border-gray-100 font-bold">{int.gestante}{int.gestante === 'SI' && int.mesesGestacion ? ` (${int.mesesGestacion} meses)` : ''}</td></tr>
                             <tr><th className="font-bold py-1 border-b border-gray-100">Lactancia:</th><td className="py-1 border-b border-gray-100">{int.lactanciaMaterna ? `Sí (${int.lactanciaMeses || 0} meses)` : 'No'}</td></tr>
-                            <tr><th className="font-bold py-1 border-b border-gray-100">Esquemas P&M/Vac:</th><td className="py-1 border-b border-gray-100">{int.esquemaAtenciones ? 'Sí' : 'No'} / {int.esquemaVacunacion ? 'Sí' : 'No'}</td></tr>
+                            <tr><th className="font-bold py-1 border-b border-gray-100">Vulnerabilidades:</th><td className="py-1 border-b border-gray-100">{getLabels(VULNERABILIDADES, int.vulnerabilidades)}</td></tr>
                           </tbody>
                         </table>
                       </div>
+
+                      {/* HISTORIAL DE ATENCIONES IMPRESO */}
+                      {int.atenciones && int.atenciones.length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-dashed border-gray-300 print:break-inside-avoid">
+                           <h4 className="font-bold text-xs uppercase tracking-widest text-gray-500 mb-2">Historial SGA (Atenciones Recientes)</h4>
+                           <table className="w-full text-left text-[10px] border-collapse">
+                             <thead>
+                               <tr className="text-gray-400">
+                                 <th className="border-b border-gray-200 py-1 font-bold">Fecha / Programa</th>
+                                 <th className="border-b border-gray-200 py-1 font-bold">Profesional</th>
+                                 <th className="border-b border-gray-200 py-1 font-bold">Nota Clínica</th>
+                               </tr>
+                             </thead>
+                             <tbody>
+                               {int.atenciones.slice(0, 3).map((at: any) => (
+                                 <tr key={at.id}>
+                                   <td className="py-1.5 border-b border-gray-50 pr-2 align-top">
+                                     <div className="font-bold">{new Date(at.createdAt).toLocaleDateString('es-CO')}</div>
+                                     <div className="uppercase">{at.programa?.nombre}</div>
+                                   </td>
+                                   <td className="py-1.5 border-b border-gray-50 pr-2 align-top font-medium">
+                                     {at.profesional?.nombre} {at.profesional?.apellidos}
+                                   </td>
+                                   <td className="py-1.5 border-b border-gray-50 align-top italic text-gray-600">
+                                     &quot;{at.motivo || at.nota || 'Consulta registrada'}&quot;
+                                   </td>
+                                 </tr>
+                               ))}
+                             </tbody>
+                           </table>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -235,17 +285,17 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
             ))
           ) : (
             <div className={sectionCls}>
-              <h2 className={headerCls}>9. Censo e Información de Integrantes</h2>
+              <h2 className={headerCls}>10. Censo e Información de Integrantes</h2>
               <p className="italic text-gray-500 text-center py-4 border border-dashed border-gray-300">No hay integrantes registrados en esta visita.</p>
             </div>
           )}
         </>
       )}
 
-      {/* Footer Legal Global (en la misma página final) */}
+      {/* FOOTER LEGAL GLOBAL */}
       <div className="mt-8 text-center text-xs text-gray-500 uppercase italic pt-4" style={{ borderTop: '2px solid black', pageBreakInside: 'avoid' }}>
         <p className="font-bold">** DOCUMENTO DE CARÁCTER CONFIDENCIAL Y RESTRINGIDO **</p>
-        <p className="mt-1 normal-case text-[10px]">Los datos sensibles de historial de salud, morbilidad transmisible y enfermedades crónicas (Sección V) correspondientes al núcleo familiar fueron excluidos de esta impresión por disposiciones legales de protección de datos personales.</p>
+        <p className="mt-1 normal-case text-[10px]">Los datos de salud e identificación familiar (APS) pertenecen al sistema departamental y su uso está regulado por la Ley de Protección de Datos Personales.</p>
         <p className="mt-1 font-mono text-[9px]">{ficha.id}</p>
       </div>
     </div>

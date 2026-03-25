@@ -1,7 +1,8 @@
-import { ArrowLeft, Printer, MapPin, Info, Home, Users, Activity, Stethoscope, FileText } from 'lucide-react'
+import { ArrowLeft, Printer, MapPin, Info, Home, Users, Activity, Stethoscope, FileText, Network } from 'lucide-react'
 import { ESTADO_VISITA, APGAR_OPCIONES, calcularEdad } from '@/lib/constants'
+import FamiliogramaViewer from './FamiliogramaViewer'
 
-export default function ResumenFicha({ ficha, onClose }: { ficha: any, onClose: () => void }) {
+export default function ResumenFicha({ ficha, onClose, onStartNew }: { ficha: any, onClose: () => void, onStartNew?: (micro: string) => void }) {
   if (!ficha) return null
 
   const fechaText = new Date(ficha.fechaDiligenciamiento).toLocaleDateString('es-CO', {
@@ -46,7 +47,11 @@ export default function ResumenFicha({ ficha, onClose }: { ficha: any, onClose: 
           >
             <Printer className="w-4 h-4" /> Imprimir Identificación
           </button>
-          <div className="px-4 py-1.5 bg-teal-100 text-teal-800 rounded-full font-black text-xs tracking-widest border border-teal-200">
+          <div className={`px-4 py-1.5 rounded-full font-black text-xs tracking-widest border ${
+            ficha.estadoVisita === '1' ? 'bg-teal-100 text-teal-800 border-teal-200' :
+            ficha.estadoVisita === '2' ? 'bg-orange-100 text-orange-800 border-orange-200' :
+            'bg-red-100 text-red-800 border-red-200'
+          }`}>
             {estadoVisitaLabel}
           </div>
         </div>
@@ -73,7 +78,11 @@ export default function ResumenFicha({ ficha, onClose }: { ficha: any, onClose: 
             <div className="grid grid-cols-2 gap-y-6 gap-x-4">
               <div>
                 <p className="text-[10px] font-black text-gray-400 tracking-wider uppercase mb-1">Territorio</p>
-                <p className="font-bold text-gray-800 text-sm">{ficha.territorio} / {ficha.microterritorio}</p>
+                <p className="font-bold text-gray-800 text-sm">
+                  {typeof ficha.territorio === 'object' && ficha.territorio 
+                    ? `${ficha.territorio.codigo} | ${ficha.territorio.nombre}` 
+                    : (ficha.territorio || ficha.territorioId)} / {ficha.microterritorio}
+                </p>
               </div>
               <div>
                 <p className="text-[10px] font-black text-gray-400 tracking-wider uppercase mb-1">Municipio</p>
@@ -124,6 +133,32 @@ export default function ResumenFicha({ ficha, onClose }: { ficha: any, onClose: 
             </div>
           </div>
         </div>
+
+        {/* REZHAZADA / NO EFECTIVA */}
+        {ficha.estadoVisita !== '1' && (
+          <div className={`border-2 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6 ${
+            ficha.estadoVisita === '2' ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200'
+          }`}>
+            <div>
+              <h3 className={`font-bold mb-1 ${ficha.estadoVisita === '2' ? 'text-orange-800' : 'text-red-800'}`}>
+                Motivo: Identificación {estadoVisitaLabel}
+              </h3>
+              <p className={`text-sm font-medium ${ficha.estadoVisita === '2' ? 'text-orange-600' : 'text-red-600'}`}>
+                {ficha.observacionesRechazo || "No se registró ninguna observación exacta en el sistema."}
+              </p>
+            </div>
+            {onStartNew && (
+              <button 
+                onClick={() => onStartNew(ficha.microterritorio)}
+                className={`px-6 py-2.5 rounded-xl font-bold shadow transition-colors flex items-center justify-center whitespace-nowrap text-white ${
+                  ficha.estadoVisita === '2' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                Nuevo Intento de Identificación
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Fila 2: Vivienda etc */}
         {ficha.estadoVisita === '1' && (
@@ -257,6 +292,23 @@ export default function ResumenFicha({ ficha, onClose }: { ficha: any, onClose: 
             })}
           </div>
         </div>
+        )}
+
+        {/* FAMILIOGRAMA AUTO-GENERADO */}
+        {ficha.estadoVisita === '1' && ficha.familiogramaCodigo && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+              <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Network className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="font-bold text-gray-800">Familiograma Inteligente</h2>
+                <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Generado Automáticamente</p>
+              </div>
+            </div>
+            
+            <FamiliogramaViewer code={ficha.familiogramaCodigo} />
+          </div>
         )}
 
       </div>

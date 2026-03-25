@@ -38,15 +38,26 @@ export const integranteSchema = z.object({
     .regex(/^3\d{9}$/, 'Debe empezar por 3 y ser numérico'),
   estadoCivil: z.string().optional().nullable(),
   parentesco: z.string().min(1, 'Requerido'),
+  
+  // Vínculos Familiares Avanzados (Familiograma)
+  padreId: z.string().optional().nullable(),
+  madreId: z.string().optional().nullable(),
+  parejaId: z.string().optional().nullable(),
+  tipoPareja: z.string().optional().nullable(), // MATRIMONIO, UNION_LIBRE, VIUDO, etc.
+  tipoHijo: z.string().optional().nullable(), // BIOLOGICO, ADOPTADO, HIJASTRO
+  estadoVital: z.string().optional().nullable().default('VIVO'), // VIVO, FALLECIDO, ABORTO
+
   // Educación y Diferencial
   nivelEducativo: z.string().optional().nullable(),
+
   ocupacion: z.string().optional().nullable(),
   regimen: z.string().optional().nullable(),
   eapb: z.string().optional().nullable(),
   etnia: z.string().optional().nullable(),
   puebloIndigena: z.string().optional().nullable(),
-  grupoPoblacional: z.array(z.string()).optional().default([]),
-  discapacidades: z.array(z.string()).optional().default([]),
+  grupoPoblacional: z.array(z.number()).default([]),
+  barrerasAcceso: z.array(z.number()).default([]),
+  discapacidades: z.array(z.number()).default([]),
 
   // V. EVALUACIÓN SALUD (Step 5)
   antecedentes: z.record(z.boolean()).optional().default({}),
@@ -126,6 +137,9 @@ export const wizardSchema = z.object({
 
   // STEP 4 & 5: Integrantes
   integrantes: z.array(integranteSchema).default([]),
+  
+  // STEP 6: Familiograma
+  familiogramaCodigo: z.string().optional().nullable(),
 }).superRefine((data, ctx) => {
   if (data.estadoVisita === '1' && (!data.integrantes || data.integrantes.length === 0)) {
     ctx.addIssue({

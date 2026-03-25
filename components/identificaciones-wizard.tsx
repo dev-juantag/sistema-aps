@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useForm, FormProvider } from "react-hook-form"
+import { useForm, FormProvider, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useGeolocation } from "@/hooks/useGeolocation"
 import { MapPin, Home, Users, UserPlus, HeartPulse, Save, ArrowLeft, ArrowRight, CheckCircle, Download } from "lucide-react"
@@ -14,6 +14,7 @@ import Step2Vivienda from "@/components/identificaciones/wizard/Step2Vivienda"
 import Step3Familia from "@/components/identificaciones/wizard/Step3Familia"
 import Step4Integrantes from "@/components/identificaciones/wizard/Step4Integrantes"
 import Step5Salud from "@/components/identificaciones/wizard/Step5Salud"
+import Step6Familiograma from "@/components/identificaciones/wizard/Step6Familiograma"
 import ConfirmModal from "@/components/ui/ConfirmModal"
 import { useAuth } from "@/lib/auth-context"
 
@@ -23,7 +24,25 @@ const STEPS = [
   { id: 3, title: "Familia", icon: Users },
   { id: 4, title: "Integrantes", icon: UserPlus },
   { id: 5, title: "Salud", icon: HeartPulse },
+  { id: 6, title: "Familiograma", icon: Users },
 ]
+
+const defaultIntegrante = {
+  primerNombre: '', segundoNombre: '', primerApellido: '', segundoApellido: '',
+  tipoDoc: 'CC', numDoc: '', fechaNacimiento: '', parentesco: '', sexo: '', gestante: 'NA', mesesGestacion: '',
+  telefono: '', nivelEducativo: '', ocupacion: '', regimen: '', eapb: '',
+  etnia: '', puebloIndigena: '', grupoPoblacional: [], discapacidades: [],
+  // Relaciones Avanzadas
+  padreId: '', madreId: '', parejaId: '', tipoPareja: 'UNION_LIBRE', tipoHijo: 'BIOLOGICO', estadoVital: 'VIVO',
+  // Evaluación Salud
+  antecedentes: {},
+  antecTransmisibles: {},
+  peso: '', talla: '', perimetroBraquial: '', diagNutricional: '',
+  practicaDeportiva: false, lactanciaMaterna: false, lactanciaMeses: '',
+  esquemaAtenciones: false, intervencionesPendientes: [],
+  enfermedadAguda: false, recibeAtencionMedica: false,
+  remisiones: [],
+}
 
 export function IdentificacionesWizard({ territorioId, microterritorio, onClose, onViewSaved }: { territorioId: string | undefined, microterritorio: string, onClose: () => void, onViewSaved?: (id: string) => void }) {
   const { user } = useAuth()
@@ -64,18 +83,32 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
       dispResiduos: [],
       riesgoAccidente: [],
       vulnerabilidades: [],
-      integrantes: [{
-        primerNombre: "", segundoNombre: "", primerApellido: "", segundoApellido: "",
-        tipoDoc: "CC", numDoc: "", fechaNacimiento: "", parentesco: "1", sexo: "HOMBRE", gestante: "NA",
-        telefono: "", nivelEducativo: "", ocupacion: "", regimen: "", eapb: "",
-        etnia: "", puebloIndigena: "", grupoPoblacional: [], discapacidades: [],
-        antecedentes: {}, antecTransmisibles: {}, peso: undefined, talla: undefined, perimetroBraquial: undefined, diagNutricional: "",
-        practicaDeportiva: false, lactanciaMaterna: false, lactanciaMeses: undefined,
-        esquemaAtenciones: false, intervencionesPendientes: [],
-        enfermedadAguda: false, recibeAtencionMedica: false, remisiones: [],
-      }]
+      numIntegrantes: "1",
+      integrantes: [defaultIntegrante as any]
     }
   })
+
+  const { fields, append, remove } = useFieldArray({
+    control: methods.control,
+    name: "integrantes"
+  })
+
+  // Sincronización automática de integrantes según el número ingresado en Step 3
+  const numIntWatch = methods.watch("numIntegrantes")
+  
+  useEffect(() => {
+    const target = parseInt(numIntWatch) || 0
+    // Solo sincronizamos si la visita es efectiva y hay un cambio en el número
+    if (methods.getValues("estadoVisita") === '1' && target > 0) {
+      if (target > fields.length) {
+        const diff = target - fields.length
+        for (let i = 0; i < diff; i++) append(defaultIntegrante as any)
+      } else if (target < fields.length) {
+        const diff = fields.length - target
+        for (let i = 0; i < diff; i++) remove(fields.length - 1 - i)
+      }
+    }
+  }, [numIntWatch, fields.length, append, remove, methods])
 
   // Obtener Info del territorio
   useEffect(() => {
@@ -87,7 +120,18 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
   const estadoVisita = methods.watch("estadoVisita")
 
   const next = async () => {
+    // Validación adicional para asegurarnos de que el conteo coincide
+    if (currentStep === 4 && estadoVisita === '1') {
+      const expected = parseInt(methods.getValues("numIntegrantes")) || 0
+      const actual = methods.getValues("integrantes")?.length || 0
+      if (actual !== expected) {
+        setStepError(`Debes registrar exactamente ${expected} integrantes según indicaste anteriormente. Tienes ${actual}.`)
+        return
+      }
+    }
+
     const getFieldsForStep = (step: number): string[] => {
+
       if (step === 1) return ["estadoVisita", "departamento", "municipio", "centroPoblado", "direccion", "numEBS", "prestadorPrimario", "tipoDocEncuestador", "numDocEncuestador", "perfilEncuestador"]
       if (step === 2) return ["numHogar", "numFamilia", "codFicha", "tipoVivienda", "tipoViviendaDesc", "matParedes", "matPisos", "matTechos", "numHogares", "numDormitorios", "estratoSocial", "hacinamiento", "fuenteAgua", "dispExcretas", "aguasResiduales", "dispResiduos", "riesgoAccidente", "fuenteEnergia", "presenciaVectores", "animales", "cantAnimales", "vacunacionMascotas"]
       if (step === 3) return ["tipoFamilia", "numIntegrantes", "apgar", "ecomapa", "cuidadorPrincipal", "zarit", "vulnerabilidades"]
@@ -116,7 +160,13 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
             `integrantes.${i}.etnia`,
             `integrantes.${i}.puebloIndigena`,
             `integrantes.${i}.grupoPoblacional`,
-            `integrantes.${i}.discapacidades`
+            `integrantes.${i}.discapacidades`,
+            `integrantes.${i}.padreId`,
+            `integrantes.${i}.madreId`,
+            `integrantes.${i}.parejaId`,
+            `integrantes.${i}.tipoPareja`,
+            `integrantes.${i}.tipoHijo`,
+            `integrantes.${i}.estadoVital`
           )
         } else if (step === 5) {
           fields.push(
@@ -137,6 +187,7 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
           )
         }
       }
+      if (step === 6) return ["familiogramaCodigo"]
       return fields
     }
 
@@ -145,7 +196,7 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
 
     if (isStepValid) {
       setStepError("")
-      setCurrentStep((s) => Math.min(s + 1, 5))
+      setCurrentStep((s) => Math.min(s + 1, 6))
       window.scrollTo(0, 0)
     } else {
       const errs = methods.formState.errors
@@ -193,11 +244,19 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
     setStepError("")
     setSaving(true)
     try {
+      // Limpieza de seguridad: si no es efectiva, no enviamos integrantes ni datos familiares
+      const payload = { ...data }
+      if (payload.estadoVisita !== '1') {
+        payload.integrantes = []
+        payload.numIntegrantes = "0"
+        payload.tipoFamilia = "7" // 'Otro' o similar, el API lo ignorará de todas formas
+      }
+
       const response = await fetch("/api/identificaciones", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          ...data, 
+          ...payload, 
           coords, 
           territorio: territorioId, 
           microterritorio,
@@ -359,6 +418,7 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
               {currentStep === 3 && <Step3Familia />}
               {currentStep === 4 && <Step4Integrantes />}
               {currentStep === 5 && <Step5Salud />}
+              {currentStep === 6 && <Step6Familiograma />}
             </div>
           </div>
 
@@ -381,7 +441,7 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
             </button>
             <div className="flex-1" />
             
-            {currentStep === 5 || (currentStep === 1 && estadoVisita !== '1') ? (
+            {currentStep === 6 || (currentStep === 1 && estadoVisita !== '1') ? (
               <button
                 type="button"
                 onClick={async () => {

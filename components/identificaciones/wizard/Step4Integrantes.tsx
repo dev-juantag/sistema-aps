@@ -5,7 +5,7 @@ import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { useState } from 'react'
 import {
   TIPO_DOCUMENTO, SEXO, PARENTESCO, NIVEL_EDUCATIVO, OCUPACION,
-  REGIMEN_SALUD, ETNIA, GRUPO_POBLACIONAL, DISCAPACIDADES, calcularEdad, calcularCursoVida
+  REGIMEN_SALUD, ETNIA, GRUPO_POBLACIONAL, DISCAPACIDADES, BARRERAS_ACCESO, calcularEdad, calcularCursoVida
 } from '@/lib/constants'
 import { inp, sel, lbl, lblStyle, required as reqStyle, chk, chkLabel, btnGreen, btnGreenStyle } from './wizardStyles'
 
@@ -14,6 +14,9 @@ const defaultIntegrante = {
   tipoDoc: 'CC', numDoc: '', fechaNacimiento: '', parentesco: '', sexo: '', gestante: 'NA', mesesGestacion: '',
   telefono: '', nivelEducativo: '', ocupacion: '', regimen: '', eapb: '',
   etnia: '', puebloIndigena: '', grupoPoblacional: [] as number[], discapacidades: [] as number[],
+  // Relaciones Avanzadas
+  padreId: '', madreId: '', parejaId: '', tipoPareja: 'UNION_LIBRE', tipoHijo: 'BIOLOGICO', estadoVital: 'VIVO',
+  // Evaluación Salud
   antecedentes: {} as Record<string, boolean>,
   antecTransmisibles: {} as Record<string, boolean>,
   peso: '', talla: '', perimetroBraquial: '', diagNutricional: '',
@@ -255,6 +258,16 @@ export default function Step4Integrantes() {
                       ))}
                     </div>
                   </F>
+                  <F label="Barreras de Acceso (múltiple)">
+                    <div className="grid grid-cols-2 gap-1 mt-1">
+                      {BARRERAS_ACCESO.map(o => (
+                        <label key={o.id} className={chkLabel}>
+                          <input type="checkbox" value={o.id} {...register(`integrantes.${i}.barrerasAcceso`)} className={chk} />
+                          <span className="text-xs leading-tight">{o.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </F>
                   <F label="Discapacidades (múltiple)">
                     <div className="grid grid-cols-2 gap-1 mt-1">
                       {DISCAPACIDADES.map(o => (
@@ -266,6 +279,7 @@ export default function Step4Integrantes() {
                     </div>
                   </F>
                 </div>
+
               </div>
             )}
           </div>

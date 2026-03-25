@@ -3,8 +3,12 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
+import { PARENTESCO, SEXO } from "@/lib/constants"
+
+import { generateFamiliogramaMermaid } from "@/lib/familiograma"
 
 export async function GET(request: Request) {
+
   try {
     const { searchParams } = new URL(request.url)
     const territorioId = searchParams.get('territorioId')
@@ -89,7 +93,11 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { integrantes, territorio, microterritorio, encuestadorId, userId, ...hogarData } = body
 
+    const isEfectiva = String(hogarData.estadoVisita) === '1';
+    const finalIntegrantes = isEfectiva ? (integrantes || []) : [];
+
     const toIntArray = (arr: any): number[] => {
+
       const arrayToProcess = Array.isArray(arr) ? arr : (arr ? [arr] : [])
       return arrayToProcess.map((val: any) => parseInt(String(val))).filter((n: number) => !isNaN(n))
     }
@@ -106,9 +114,19 @@ export async function POST(req: Request) {
       direccion: String(hogarData.direccion || ''),
       latitud: hogarData.latitud ? parseFloat(hogarData.latitud) : null,
       longitud: hogarData.longitud ? parseFloat(hogarData.longitud) : null,
-      fechaDiligenciamiento: hogarData.fechaDiligenciamiento
-        ? new Date(hogarData.fechaDiligenciamiento)
-        : new Date(),
+      fechaDiligenciamiento: (() => {
+        if (!hogarData.fechaDiligenciamiento) return new Date();
+        const dateStr = String(hogarData.fechaDiligenciamiento);
+        // If it's just "YYYY-MM-DD", add current local time so it doesn't default to 7PM UTC problem
+        if (dateStr.length <= 10 && dateStr.includes('-')) {
+          const parts = dateStr.split('-');
+          if (parts.length === 3) {
+            const now = new Date();
+            return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), now.getHours(), now.getMinutes(), now.getSeconds());
+          }
+        }
+        return new Date(dateStr);
+      })(),
       encuestadorId: encuestadorId || userId || null,
       numEBS: hogarData.numEBS || null,
       prestadorPrimario: hogarData.prestadorPrimario || null,
@@ -139,20 +157,21 @@ export async function POST(req: Request) {
       vacunacionMascotas: hogarData.vacunacionMascotas === true || hogarData.vacunacionMascotas === 'true',
       
       // Familia
-      tipoFamilia: hogarData.tipoFamilia ? parseInt(hogarData.tipoFamilia) : null,
-      numIntegrantes: hogarData.numIntegrantes ? parseInt(hogarData.numIntegrantes) : null,
-      apgar: hogarData.apgar ? parseInt(hogarData.apgar) : null,
-      ecomapa: hogarData.ecomapa ? parseInt(hogarData.ecomapa) : null,
-      cuidadorPrincipal: hogarData.cuidadorPrincipal === true || hogarData.cuidadorPrincipal === 'true',
-      zarit: hogarData.zarit ? parseInt(hogarData.zarit) : null,
-      vulnerabilidades: Array.isArray(hogarData.vulnerabilidades) ? hogarData.vulnerabilidades : [],
+      tipoFamilia: isEfectiva ? (hogarData.tipoFamilia ? parseInt(hogarData.tipoFamilia) : null) : null,
+      numIntegrantes: isEfectiva ? (hogarData.numIntegrantes ? parseInt(hogarData.numIntegrantes) : null) : 0,
+      apgar: isEfectiva ? (hogarData.apgar ? parseInt(hogarData.apgar) : null) : null,
+      ecomapa: isEfectiva ? (hogarData.ecomapa ? parseInt(hogarData.ecomapa) : null) : null,
+      cuidadorPrincipal: isEfectiva ? (hogarData.cuidadorPrincipal === true || hogarData.cuidadorPrincipal === 'true') : false,
+      zarit: isEfectiva ? (hogarData.zarit ? parseInt(hogarData.zarit) : null) : null,
+      vulnerabilidades: isEfectiva ? (Array.isArray(hogarData.vulnerabilidades) ? hogarData.vulnerabilidades : []) : [],
+      familiogramaCodigo: isEfectiva && hogarData.familiogramaCodigo ? hogarData.familiogramaCodigo : (finalIntegrantes.length > 0 ? generateFamiliogramaMermaid(finalIntegrantes) : null),
     }
 
     const result = await prisma.$transaction(async (tx) => {
       const ficha = await tx.fichaHogar.create({ data: fichaData as any })
 
-      if (integrantes && Array.isArray(integrantes)) {
-        for (const int of integrantes) {
+      if (finalIntegrantes.length > 0) {
+        for (const int of finalIntegrantes) {
           const nombresArr = [int.primerNombre, int.segundoNombre].filter(Boolean)
           const apellidosArr = [int.primerApellido, int.segundoApellido].filter(Boolean)
           
@@ -176,6 +195,7 @@ export async function POST(req: Request) {
             etnia: int.etnia ? parseInt(int.etnia) : null,
             puebloIndigena: int.puebloIndigena || null,
             grupoPoblacional: toIntArray(int.grupoPoblacional),
+            barrerasAcceso: toIntArray(int.barrerasAcceso),
             discapacidades: toIntArray(int.discapacidades),
             antecedentes: int.antecedentes || {},
             antecTransmisibles: int.antecTransmisibles || {},

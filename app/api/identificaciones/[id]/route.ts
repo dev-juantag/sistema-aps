@@ -21,6 +21,7 @@ export async function GET(
             documento: true,
           }
         },
+        territorio: true,
         pacientes: {
           include: {
             atenciones: {
@@ -41,7 +42,14 @@ export async function GET(
       return NextResponse.json({ error: "Identificación no encontrada" }, { status: 404 });
     }
 
+    // Generar familiograma si no existe o para asegurar frescura en visualización
+    if (!ficha.familiogramaCodigo && ficha.pacientes && ficha.pacientes.length > 0) {
+       const { generateFamiliogramaMermaid } = await import("@/lib/familiograma");
+       ficha.familiogramaCodigo = generateFamiliogramaMermaid(ficha.pacientes);
+    }
+
     return NextResponse.json(ficha);
+
   } catch (error: any) {
     console.error("GET FICHA ERROR:", error);
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });

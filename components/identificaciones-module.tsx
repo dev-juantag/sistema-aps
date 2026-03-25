@@ -84,43 +84,22 @@ export function IdentificacionesModule() {
   const handleExport = async () => {
     setExporting(true)
     try {
-      if (filteredFichas.length === 0) return alert("No hay datos para exportar")
-
-      const headers = [
-        "Ficha", "Estado_Visita", "Territorio", "Microterritorio", 
-        "Ubicacion_Desc", "Direccion", "Estrato", "EBS", "Num_Integrantes",
-        "Encuestador_Nombre", "Encuestador_Doc", "Fecha_Creacion"
-      ]
-
-      const escapeCsv = (str?: string) => {
-        if (!str) return '""';
-        return `"${str.toString().replace(/"/g, '""')}"`;
-      }
-
-      const rows = filteredFichas.map(f => [
-        escapeCsv(f.consecutivo.toString()),
-        escapeCsv(f.estadoVisita === "1" ? "Efectiva" : f.estadoVisita === "2" ? "No Efectiva" : "Rechazada"),
-        escapeCsv(f.territorio),
-        escapeCsv(f.microterritorio),
-        escapeCsv(f.descripcionUbicacion),
-        escapeCsv(f.direccion),
-        escapeCsv(f.estratoSocial?.toString()),
-        escapeCsv(f.numEBS),
-        escapeCsv(f.integrantesCount?.toString() || "0"),
-        escapeCsv(f.encuestador ? `${f.encuestador.nombre} ${f.encuestador.apellidos}` : "Sin asignación"),
-        escapeCsv(f.encuestador?.documento),
-        escapeCsv(f.fechaDiligenciamiento.split("T")[0])
-      ])
-
-      const csvContent = "\uFEFF" + headers.join(";") + "\n" + rows.map(e => e.join(";")).join("\n")
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement("a")
-      link.setAttribute("href", url)
-      link.setAttribute("download", `FichasHogar_${new Date().toISOString().split('T')[0]}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      const exportUrl = user ? `/api/identificaciones/exportar?role=${user.rol}&territorioId=${user.territorioId || ''}` : '/api/identificaciones/exportar'
+      
+      const response = await fetch(exportUrl)
+      if (!response.ok) throw new Error("Error al exportar los datos")
+      
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Base_Completa_Identificaciones_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (e: any) {
+      alert(e.message)
     } finally {
       setExporting(false)
     }
@@ -383,6 +362,12 @@ export function IdentificacionesModule() {
                     <ResumenFicha 
                       ficha={selectedFichaDetail} 
                       onClose={() => { setShowDetailModal(false); setSelectedFichaDetail(null); }} 
+                      onStartNew={(micro: string) => {
+                        setShowDetailModal(false); 
+                        setSelectedFichaDetail(null);
+                        setSelectedMicro(micro);
+                        setIsWizardOpen(true);
+                      }}
                     />
                   </div>
                   {/* Elemento reservado SÓLO para el momento crítico de imprimir */}

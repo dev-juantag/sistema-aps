@@ -13,7 +13,9 @@ import {
   Database,
   CheckCircle2,
   MapPin,
-  Stethoscope
+  Stethoscope,
+  Baby,
+  HeartPulse,
 } from "lucide-react"
 import {
   BarChart,
@@ -23,6 +25,10 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+  Legend
 } from "recharts"
 
 import useSWR from "swr"
@@ -75,8 +81,13 @@ export function DashboardHome() {
     swrOptions
   )
   const { data: terrsData, error: errTerr } = useSWR("/api/territorios", fetcher, swrOptions)
+  const { data: idStats } = useSWR(
+    user?.rol === "auxiliar" || isAdmin ? `/api/identificaciones/stats?role=${user?.rol}&territorioId=${user?.rol === "auxiliar" ? user?.territorioId : ""}` : null,
+    fetcher,
+    swrOptions
+  )
 
-  const loading = !atencionesData || !usuariosData || !programasData || !stageData || !terrsData || ((user?.rol === "auxiliar" || isAdmin) && !identificacionesData)
+  const loading = !atencionesData || !usuariosData || !programasData || !stageData || !terrsData || ((user?.rol === "auxiliar" || isAdmin) && (!identificacionesData || !idStats))
   
   const atenciones = useMemo(() => Array.isArray(atencionesData) ? atencionesData : [], [atencionesData])
   const indentificaciones = useMemo(() => Array.isArray(identificacionesData) ? identificacionesData : [], [identificacionesData])
@@ -252,18 +263,6 @@ export function DashboardHome() {
           color: "bg-chart-4/10 text-chart-4",
         },
         {
-          label: "# Programas",
-          value: programas.length,
-          icon: <Activity className="h-5 w-5" />,
-          color: "bg-indigo-100 text-indigo-600",
-        },
-        {
-          label: "# Territorios (Con ids)",
-          value: chartDataIdentificacionesRoles.length,
-          icon: <MapPin className="h-5 w-5" />,
-          color: "bg-fuchsia-100 text-fuchsia-600",
-        },
-        {
           label: "Atenciones Pendientes Facturar",
           value: filteredAtenciones.filter((a: any) => a.estadoFacturacion === "PENDIENTE").length,
           icon: <Database className="h-5 w-5" />,
@@ -335,7 +334,7 @@ export function DashboardHome() {
       </div>
 
       {/* KPI Cards */}
-      <div className={`grid gap-4 ${isAdmin ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
+      <div className={`grid gap-4 ${isAdmin ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
         {kpis.map((kpi) => (
           <div
             key={kpi.label}
@@ -351,6 +350,111 @@ export function DashboardHome() {
           </div>
         ))}
       </div>
+
+      {idStats && (user?.rol === "auxiliar" || isAdmin) && (
+        <>
+          <div className="flex items-center gap-2 mt-2 border-b border-border pb-2">
+            <HeartPulse className="h-6 w-6 text-destructive" />
+            <h2 className="text-xl font-bold text-foreground">
+              Vigilancia Epidemiológica y Demográfica
+            </h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
+              <Baby className="mx-auto h-8 w-8 text-chart-2 mb-2" />
+              <p className="text-3xl font-bold text-foreground">{idStats.kpis.menores5}</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Primera Infancia (&lt;5 Años)</p>
+            </div>
+            <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
+              <Activity className="mx-auto h-8 w-8 text-destructive mb-2" />
+              <p className="text-3xl font-bold text-foreground">{idStats.kpis.gestantes}</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Gestantes Activas</p>
+            </div>
+            <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
+              <Users className="mx-auto h-8 w-8 text-chart-4 mb-2" />
+              <p className="text-3xl font-bold text-foreground">{idStats.kpis.mayores60}</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Adultos Mayores (60+ Años)</p>
+            </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Pirámide Poblacional */}
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm flex flex-col items-center">
+              <div className="w-full mb-4 flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold text-foreground">
+                  Pirámide Poblacional
+                </h2>
+              </div>
+              <div className="w-full h-[300px]">
+                {idStats.piramide.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart layout="vertical" data={idStats.piramide} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="oklch(0.9 0.02 285)" />
+                      <XAxis type="number" />
+                      <YAxis dataKey="label" type="category" width={80} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} />
+                      <Tooltip
+                        cursor={{ fill: 'transparent' }}
+                        contentStyle={{ backgroundColor: "var(--card)", borderRadius: "8px", borderColor: "var(--border)" }}
+                      />
+                      <Legend />
+                      <Bar dataKey="mujeres" name="Mujeres" fill="#ec4899" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="hombres" name="Hombres" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-muted-foreground mt-20 text-center text-sm">Sin datos para la pirámide poblacional.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Mapa de Densidad Territorial */}
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm flex flex-col items-center">
+              <div className="w-full mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-chart-2" />
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Densidad Territorial
+                  </h2>
+                </div>
+                <div className="px-2 py-0.5 bg-chart-2/10 text-chart-2 text-[10px] uppercase font-bold rounded">
+                  Concentración
+                </div>
+              </div>
+              <div className="w-full h-[300px]">
+                {idStats.densidad.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.9 0.02 285)" />
+                      <XAxis type="number" dataKey="x" name="Terr." hide />
+                      <YAxis type="number" dataKey="y" name="Fichas" hide />
+                      <ZAxis type="number" dataKey="z" range={[200, 3000]} name="Cant." />
+                      <Tooltip 
+                        cursor={{ strokeDasharray: '3 3' }}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload
+                            return (
+                              <div className="bg-card border border-border p-3 rounded-lg shadow-md text-sm">
+                                <p className="font-bold text-foreground mb-1">{data.name}</p>
+                                <p className="text-muted-foreground">Fichas en la zona: <span className="font-bold text-chart-2">{data.z}</span></p>
+                              </div>
+                            )
+                          }
+                          return null
+                        }}
+                      />
+                      <Scatter name="Territorios" data={idStats.densidad} fill="oklch(0.65 0.15 calc(var(--brand-hue) - 85))" />
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-muted-foreground mt-20 text-center text-sm">Sin datos para mostrar de territorios.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Chart 1: Auxiliar o Admin/Profs */}
@@ -468,8 +572,8 @@ export function DashboardHome() {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {user?.rol === "auxiliar"
-                          ? `En: ${a.territorio} — ${getRelativeTime(a.createdAtISO, a.fechaDiligenciamiento)}`
-                          : `Por: ${a.profesionalNombre} - ${getRelativeTime(a.createdAtISO, a.fecha)}`
+                          ? `En: ${a.microterritorio} — ${getRelativeTime(a.fechaDiligenciamiento)}`
+                          : `Por: ${a.profesionalNombre}`
                         }
                       </p>
                       {(user?.rol === "auxiliar" && a.encuestador) && (
@@ -539,7 +643,7 @@ export function DashboardHome() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{a.direccion}</p>
                       <p className="text-xs text-muted-foreground">
-                        En: {a.territorio} — {getRelativeTime(a.createdAtISO, a.fechaDiligenciamiento)}
+                        En: {a.territorio} — {getRelativeTime(a.fechaDiligenciamiento)}
                       </p>
                       {a.encuestador && (
                         <p className="text-[11px] text-muted-foreground/80 mt-0.5">
