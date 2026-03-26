@@ -1,7 +1,9 @@
 "use client"
-
 import { useState } from "react"
+
 import { useAuth } from "@/lib/auth-context"
+import useSWR from "swr"
+import { fetcher } from "@/lib/fetcher"
 import {
   Heart,
   LayoutDashboard,
@@ -41,6 +43,15 @@ export function Dashboard() {
   const [activeView, setActiveView] = useState<View>("inicio")
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  const { data: rawProgramas } = useSWR("/api/programas", fetcher)
+  const programas = Array.isArray(rawProgramas) ? rawProgramas : []
+
+  const isEnfermeria = () => {
+    if (!user || user.rol !== 'profesional' || !user.programaId) return false;
+    const prog = programas.find((p: any) => String(p.id) === String(user.programaId));
+    return prog ? prog.nombre.toLowerCase().includes('enfermer') : false;
+  }
+
   const navItems: NavItem[] = [
     { id: "inicio", label: "Inicio", icon: <LayoutDashboard className="h-5 w-5" /> },
   ]
@@ -49,7 +60,7 @@ export function Dashboard() {
     navItems.push({ id: "atenciones", label: "Atenciones", icon: <ClipboardList className="h-5 w-5" /> })
   }
   
-  if (user?.rol === "auxiliar" || isAdmin || user?.rol === "superadmin") {
+  if (user?.rol === "auxiliar" || isAdmin || user?.rol === "superadmin" || isEnfermeria()) {
     navItems.push({ id: "identificaciones", label: "Identificaciones", icon: <Database className="h-5 w-5" /> })
   }
 

@@ -1,9 +1,28 @@
-import { ArrowLeft, Printer, MapPin, Info, Home, Users, Activity, Stethoscope, FileText, Network } from 'lucide-react'
+import { ArrowLeft, Printer, MapPin, Info, Home, Users, Activity, Stethoscope, FileText, Network, Edit } from 'lucide-react'
 import { ESTADO_VISITA, APGAR_OPCIONES, calcularEdad } from '@/lib/constants'
 import FamiliogramaViewer from './FamiliogramaViewer'
 
-export default function ResumenFicha({ ficha, onClose, onStartNew }: { ficha: any, onClose: () => void, onStartNew?: (micro: string) => void }) {
+import { useAuth } from '@/lib/auth-context'
+import useSWR from "swr"
+import { fetcher } from "@/lib/fetcher"
+
+export default function ResumenFicha({ 
+  ficha, onClose, onStartNew, onEnableUpdate, onGoToEdit 
+}: { 
+  ficha: any, onClose: () => void, onStartNew?: (micro: string) => void,
+  onEnableUpdate?: (id: string, current: boolean) => void,
+  onGoToEdit?: () => void
+}) {
+  const { user, isSuperAdmin, isAdmin } = useAuth()
+  const { data: rawProgramas } = useSWR("/api/programas", fetcher)
+  
   if (!ficha) return null
+
+  const isEnfermeria = () => {
+    if (!user || user.rol !== 'profesional' || !user.programaId) return false;
+    const prog = Array.isArray(rawProgramas) ? rawProgramas.find((p: any) => String(p.id) === String(user.programaId)) : null;
+    return prog ? prog.nombre.toLowerCase().includes('enfermer') : false;
+  }
 
   const fechaText = new Date(ficha.fechaDiligenciamiento).toLocaleDateString('es-CO', {
     day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: 'numeric'
@@ -11,12 +30,29 @@ export default function ResumenFicha({ ficha, onClose, onStartNew }: { ficha: an
 
   const getLabel = (arr: any[], id: any) => arr.find(x => String(x.id) === String(id))?.label || id || 'N/A'
 
+  // Prioridad: 1) usuario real vinculado, 2) datos crudos de importación CSV
   const nombreEncuestador = ficha.encuestador 
-    ? `${ficha.encuestador.nombre} ${ficha.encuestador.apellidos}`
-    : 'Auxiliar'
-  const docEncuestador = ficha.encuestador?.documento || ficha.numDocEncuestador || 'N/A'
+    ? `${ficha.encuestador.nombre} ${ficha.encuestador.apellidos}`.trim()
+    : (ficha.encuestadorNombreRaw || 'Sin registrar')
+  const docEncuestador = ficha.encuestador?.documento 
+    || ficha.encuestadorDocRaw 
+    || ficha.numDocEncuestador 
+    || 'N/A'
 
   const estadoVisitaLabel = getLabel(ESTADO_VISITA, ficha.estadoVisita)
+  
+  const codigoTerritorio = ficha.territorioCodigo || ficha.territorio?.codigo || ''
+
+  // Formato visual para IDs garantizando que tengan el código del territorio y hogar para trazabilidad
+  let displayNumHogar = ficha.numHogar || '-';
+  if (ficha.numHogar && codigoTerritorio && !ficha.numHogar.startsWith(codigoTerritorio)) {
+    displayNumHogar = `${codigoTerritorio}${ficha.numHogar.replace(/^H?/, 'H')}`; // Ej: T14 + H2408
+  }
+
+  let displayNumFamilia = ficha.numFamilia || '-';
+  if (ficha.numFamilia && displayNumHogar !== '-' && !ficha.numFamilia.startsWith(displayNumHogar)) {
+    displayNumFamilia = `${displayNumHogar}${ficha.numFamilia.replace(/^F?/, 'F')}`; // Ej: T14H2408 + F0008
+  }
 
   return (
     <div className="w-full flex flex-col font-sans bg-gray-50/50 min-h-[70vh]">
@@ -54,6 +90,31 @@ export default function ResumenFicha({ ficha, onClose, onStartNew }: { ficha: an
           }`}>
             {estadoVisitaLabel}
           </div>
+          
+          {/* Botones de Actualización */}
+          {(isSuperAdmin || isAdmin || isEnfermeria()) && onEnableUpdate && (
+            <button
+              onClick={() => onEnableUpdate(ficha.id, ficha.puedeActualizarse)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold text-xs shadow-sm transition-colors border ${
+                ficha.puedeActualizarse 
+                  ? 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200' 
+                  : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+              }`}
+            >
+              <Edit className="w-3 h-3" /> 
+              {ficha.puedeActualizarse ? 'Deshabilitar Edición' : 'Permitir Edición'}
+            </button>
+          )}
+
+          {user?.rol === 'auxiliar' && ficha.puedeActualizarse && onGoToEdit && (
+            <button
+              onClick={onGoToEdit}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-400 text-amber-900 rounded-full font-black text-sm shadow hover:bg-amber-500 transition-colors"
+            >
+              <Edit className="w-4 h-4" /> Actualizar Ficha
+            </button>
+          )}
+
         </div>
       </div>
 
@@ -79,9 +140,7 @@ export default function ResumenFicha({ ficha, onClose, onStartNew }: { ficha: an
               <div>
                 <p className="text-[10px] font-black text-gray-400 tracking-wider uppercase mb-1">Territorio</p>
                 <p className="font-bold text-gray-800 text-sm">
-                  {typeof ficha.territorio === 'object' && ficha.territorio 
-                    ? `${ficha.territorio.codigo} | ${ficha.territorio.nombre}` 
-                    : (ficha.territorio || ficha.territorioId)} / {ficha.microterritorio}
+                  {codigoTerritorio || ficha.territorio || ficha.territorioId || 'S/N'} / {ficha.microterritorio}
                 </p>
               </div>
               <div>
@@ -118,17 +177,20 @@ export default function ResumenFicha({ ficha, onClose, onStartNew }: { ficha: an
               </div>
               <div className="col-span-2">
                 <p className="text-[10px] font-black text-gray-400 tracking-wider uppercase mb-1">Encuestador Creador</p>
-                <p className="font-bold text-gray-800 text-sm uppercase flex items-center gap-2">
-                  {nombreEncuestador} <span className="bg-gray-100 text-gray-500 text-[10px] px-2 py-0.5 rounded-md font-mono">ID {docEncuestador}</span>
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-gray-800 text-sm uppercase">{nombreEncuestador}</span>
+                  <span className="bg-blue-50 text-blue-700 border border-blue-100 text-[10px] px-2 py-0.5 rounded font-mono font-bold tracking-wide">
+                    C.C. {docEncuestador}
+                  </span>
+                </div>
               </div>
               <div>
                 <p className="text-[10px] font-black text-gray-400 tracking-wider uppercase mb-1">Núm Hogar</p>
-                <p className="font-bold text-gray-800 text-sm">{ficha.numHogar || '-'}</p>
+                <p className="font-bold text-gray-800 text-sm">{displayNumHogar}</p>
               </div>
               <div>
                 <p className="text-[10px] font-black text-gray-400 tracking-wider uppercase mb-1">Familia ID</p>
-                <p className="font-bold text-gray-800 text-sm">{ficha.numFamilia || '-'}</p>
+                <p className="font-bold text-gray-800 text-sm">{displayNumFamilia}</p>
               </div>
             </div>
           </div>
@@ -224,7 +286,7 @@ export default function ResumenFicha({ ficha, onClose, onStartNew }: { ficha: an
             {ficha.pacientes?.map((pac: any, i: number) => {
               const iniciales = `${pac.nombres.charAt(0)}${pac.apellidos.charAt(0)}`.toUpperCase()
               return (
-                  <div className="flex flex-col gap-4 p-4 rounded-xl border border-gray-100 hover:border-gray-300 transition-colors">
+                  <div key={pac.id || i} className="flex flex-col gap-4 p-4 rounded-xl border border-gray-100 hover:border-gray-300 transition-colors">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-gray-100 text-gray-500 font-black text-lg flex items-center justify-center flex-shrink-0">

@@ -578,7 +578,7 @@ export function DashboardHome() {
                       </p>
                       {(user?.rol === "auxiliar" && a.encuestador) && (
                         <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                          Por: <span className="font-medium text-foreground/80">{a.encuestador?.nombre} {a.encuestador?.apellidos}</span>
+                          Por: <span className="font-medium text-foreground/80">{a.encuestador?.nombre} {a.encuestador?.apellidos}</span> - <span>C.C. {a.encuestador?.documento || 'No disp.'}</span>
                         </p>
                       )}
                     </div>

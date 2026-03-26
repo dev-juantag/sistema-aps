@@ -28,6 +28,9 @@ import {
   X,
   Trash2,
   AlertTriangle,
+  Upload,
+  FileSpreadsheet,
+  Loader2
 } from "lucide-react"
 import { useEffect } from "react"
 
@@ -48,6 +51,12 @@ export function AtencionesModule() {
   const [exportStart, setExportStart] = useState("")
   const [exportEnd, setExportEnd] = useState("")
   const [showExportAlert, setShowExportAlert] = useState(false)
+
+  // Importación
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importStatus, setImportStatus] = useState<{success?: string, error?: string} | null>(null)
 
   const atencionesUrl = isAdmin ? "/api/atenciones" : (user ? `/api/atenciones?profesionalId=${user.id}` : null)
   const { data: atencionesData, error: errAt, mutate: mutateAtenciones } = useSWR(atencionesUrl, fetcher)
@@ -231,9 +240,66 @@ export function AtencionesModule() {
     setShowExportModal(false)
   }
 
+  const handleDownloadTemplate = () => {
+    const headers = [
+      "Fecha (YYYY-MM-DD)", "Paciente_Nombre", "Paciente_Documento", "Paciente_Tipo_Doc", 
+      "Paciente_Genero", "Paciente_Fecha_Nac", "Paciente_Telefono", "Paciente_Direccion", 
+      "Programa_ID", "Profesional_Documento", "Nota_Valoracion"
+    ]
+    const csvContent = "\uFEFF" + headers.join(";") + "\n" +
+      `2024-01-01;Juan Perez;12345678;CC;MASCULINO;1990-05-15;3111234567;Calle 1 #2-3;${programas[0]?.id || "ID_PROG"};80123456;Nota de ejemplo`
+      
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.setAttribute("href", url)
+    link.setAttribute("download", "plantilla_importar_atenciones.csv")
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const handleImport = async () => {
+    if (!importFile) return
+    setImporting(true)
+    setImportStatus(null)
+    
+    try {
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        const text = e.target?.result as string
+        const lines = text.split(/\r?\n/).filter(l => l.trim() !== '')
+        if (lines.length < 2) {
+          setImportStatus({ error: "El archivo está vacío o no tiene datos" })
+          setImporting(false)
+          return
+        }
+
+        // Enviamos el CSV completo a la API
+        const resp = await fetch('/api/atenciones/importar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ csv: text })
+        })
+
+        const result = await resp.json()
+        if (resp.ok) {
+          setImportStatus({ success: `Importación exitosa: ${result.imported} registros creados.` })
+          mutateAtenciones()
+        } else {
+          setImportStatus({ error: result.error || "Error en la importación" })
+        }
+        setImporting(false)
+      }
+      reader.readAsText(importFile)
+    } catch (err) {
+      setImportStatus({ error: "Error de lectura de archivo" })
+      setImporting(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Atenciones</h1>
@@ -244,6 +310,15 @@ export function AtencionesModule() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {isSuperAdmin && (
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+            >
+              <Upload className="h-4 w-4" />
+              Importar
+            </button>
+          )}
           <button
             onClick={() => setShowExportModal(true)}
             className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
@@ -349,7 +424,7 @@ export function AtencionesModule() {
                 </tr>
               ) : (
                 (() => {
-                  const limitDate = currentStageStart ? new Date(currentStageStart) : new Date(0)
+                  const limitDate = currentStageStart ? new Date(currentStageStart as string) : new Date(0)
                   const currentAtenciones = isAdmin && currentStageStart 
                     ? filtered.filter(a => new Date(a.createdAtISO || (a.fecha + "T00:00:00")) >= limitDate)
                     : filtered;
@@ -530,6 +605,71 @@ export function AtencionesModule() {
                 <Download className="h-4 w-4" />
                 Sí, Exportar y Descargar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-foreground">Importar Atenciones</h2>
+              <button 
+                onClick={() => setShowImportModal(false)}
+                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                Sube un archivo CSV con el formato requerido. Se recomienda descargar la plantilla primero.
+              </p>
+
+              <button
+                onClick={handleDownloadTemplate}
+                className="flex items-center justify-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/10 transition-colors w-full"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                Descargar Plantilla CSV
+              </button>
+
+              <div className="flex flex-col gap-2 mt-2">
+                <label className="text-sm font-medium text-foreground">Archivo CSV (Separado por ;)</label>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                  className="w-full text-sm text-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                />
+              </div>
+
+              {importStatus && (
+                <div className={`p-3 rounded-lg text-sm ${importStatus?.error ? 'bg-destructive/10 text-destructive' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
+                  {importStatus?.error || importStatus?.success}
+                </div>
+              )}
+
+              <div className="mt-4 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowImportModal(false)}
+                  className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  disabled={importing}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleImport}
+                  className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50"
+                  disabled={!importFile || importing}
+                >
+                  {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {importing ? "Importando..." : "Subir e Importar"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

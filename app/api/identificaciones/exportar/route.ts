@@ -36,11 +36,15 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const role = searchParams.get('role')
     const territorioId = searchParams.get('territorioId')
+    const userId = searchParams.get('userId')
 
     let whereClause: any = {}
 
-    if (role === 'auxiliar' && territorioId) {
-      whereClause.territorioId = territorioId
+    if (role === 'auxiliar') {
+      if (territorioId) whereClause.territorioId = territorioId
+      if (userId) whereClause.encuestadorId = userId
+    } else if (role === 'profesional') {
+      if (territorioId) whereClause.territorioId = territorioId
     }
 
     const fichas = await prisma.fichaHogar.findMany({
@@ -99,8 +103,9 @@ export async function GET(request: Request) {
         cleanCsv(f.latitud),
         cleanCsv(f.longitud),
         cleanCsv(f.fechaDiligenciamiento ? new Date(f.fechaDiligenciamiento).toISOString().split('T')[0] : ''),
-        cleanCsv(f.encuestador ? `${f.encuestador.nombre} ${f.encuestador.apellidos}` : ''),
-        cleanCsv(f.encuestador?.documento || ''),
+        // Nombre encuestador: usuario real o datos raw del CSV
+        cleanCsv(f.encuestador ? `${f.encuestador.nombre} ${f.encuestador.apellidos}` : ((f as any).encuestadorNombreRaw || '')),
+        cleanCsv(f.encuestador?.documento || (f as any).encuestadorDocRaw || ''),
         // VIVIENDA
         cleanCsv(getLabel(TIPO_VIVIENDA, f.tipoVivienda)),
         cleanCsv(getLabel(MATERIAL_PAREDES, f.matParedes)),

@@ -102,6 +102,7 @@ model FichaHogar {
   id                    String       @id @default(uuid())
   consecutivo           Int          @unique @default(autoincrement())
   estadoVisita          String
+  puedeActualizarse     Boolean      @default(false)
   observacionesRechazo  String?
   departamento          String
   municipio             String
@@ -112,6 +113,8 @@ model FichaHogar {
   longitud              Float?
   fechaDiligenciamiento DateTime     @default(now())
   encuestadorId         String?
+  encuestadorNombreRaw  String?   // Nombre del encuestador tal como viene del CSV (sin usuario)
+  encuestadorDocRaw     String?   // Documento del encuestador tal como viene del CSV (sin usuario)
   fuenteAgua            Int[]
   dispExcretas          Int[]
   aguasResiduales       Int[]

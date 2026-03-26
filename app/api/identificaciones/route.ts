@@ -33,24 +33,15 @@ export async function GET(request: Request) {
       }
     }
 
-    const fichas = await prisma.fichaHogar.findMany({
+    const fichas = await (prisma.fichaHogar as any).findMany({
       where: whereClause,
       include: {
-        territorio: true,
-        encuestador: {
-          select: {
-            nombre: true,
-            apellidos: true,
-            documento: true
-          }
-        },
-        _count: {
-          select: { pacientes: true }
-        }
+        territorio: { select: { id: true, nombre: true } },
+        encuestador: { select: { nombre: true, apellidos: true, documento: true } },
+        pacientes: { select: { documento: true } },
+        _count: { select: { pacientes: true } }
       },
-      orderBy: {
-        createdAt: 'desc'
-      }
+      orderBy: { createdAt: 'desc' }
     })
 
     const formattedFichas = fichas.map(f => ({
@@ -73,8 +64,13 @@ export async function GET(request: Request) {
         nombre: f.encuestador.nombre,
         apellidos: f.encuestador.apellidos,
         documento: f.encuestador.documento
+      } : ((f as any).encuestadorNombreRaw || (f as any).encuestadorDocRaw) ? {
+        nombre: (f as any).encuestadorNombreRaw || 'Sin nombre',
+        apellidos: '',
+        documento: (f as any).encuestadorDocRaw || ''
       } : null,
-      integrantesCount: f._count.pacientes
+      integrantesCount: f._count.pacientes,
+      integrantesDocs: f.pacientes.map((p: any) => p.documento),
     }))
 
     return NextResponse.json(formattedFichas)

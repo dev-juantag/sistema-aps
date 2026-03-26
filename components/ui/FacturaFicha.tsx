@@ -68,8 +68,8 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
               <tbody>
                 <tr><Th>Estado de la Visita</Th><Td><span className="font-bold uppercase bg-gray-200 px-2 py-1 rounded">{getLabel(ESTADO_VISITA, ficha.estadoVisita)}</span></Td></tr>
                 <tr><Th>Fecha de Diligenciamiento</Th><Td>{new Date(ficha.fechaDiligenciamiento).toLocaleString('es-CO')}</Td></tr>
-                <tr>< Th>Responsable / Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.nombre} ${ficha.encuestador.apellidos}` : ficha.perfilEncuestador}</Td></tr>
-                <tr><Th>Doc. Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.documento}` : ficha.numDocEncuestador}</Td></tr>
+                <tr><Th>Responsable / Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.nombre} ${ficha.encuestador.apellidos}` : (ficha.encuestadorNombreRaw || ficha.perfilEncuestador || 'N/A')}</Td></tr>
+                <tr><Th>Doc. Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.documento}` : (ficha.encuestadorDocRaw || ficha.numDocEncuestador || 'N/A')}</Td></tr>
               </tbody>
             </table>
           </div>
@@ -104,8 +104,8 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
                 <tr><Th>Fecha de Diligenciamiento</Th><Td>{new Date(ficha.fechaDiligenciamiento).toLocaleString('es-CO')}</Td></tr>
                 <tr><Th>Prestador Primario</Th><Td>{ficha.prestadorPrimario || 'N/A'}</Td></tr>
                 <tr><Th>Código EBS (No. Identificación)</Th><Td>{ficha.numEBS || 'N/A'}</Td></tr>
-                <tr><Th>Responsable / Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.nombre} ${ficha.encuestador.apellidos}` : ficha.perfilEncuestador}</Td></tr>
-                <tr><Th>Doc. Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.documento}` : ficha.numDocEncuestador}</Td></tr>
+                <tr><Th>Responsable / Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.nombre} ${ficha.encuestador.apellidos}` : (ficha.encuestadorNombreRaw || ficha.perfilEncuestador || 'N/A')}</Td></tr>
+                <tr><Th>Doc. Encuestador</Th><Td>{ficha.encuestador ? `${ficha.encuestador.documento}` : (ficha.encuestadorDocRaw || ficha.numDocEncuestador || 'N/A')}</Td></tr>
               </tbody>
             </table>
 

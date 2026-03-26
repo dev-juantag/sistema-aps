@@ -8,6 +8,7 @@ import { MapPin, Home, Users, UserPlus, HeartPulse, Save, ArrowLeft, ArrowRight,
 import { wizardSchema, type WizardData } from "@/lib/schemas"
 import useSWR from "swr"
 import { fetcher } from "@/lib/fetcher"
+import { mapFichaToWizardData } from "@/lib/mapFichaToWizard"
 
 import Step1InfoGeneral from "@/components/identificaciones/wizard/Step1InfoGeneral"
 import Step2Vivienda from "@/components/identificaciones/wizard/Step2Vivienda"
@@ -44,7 +45,19 @@ const defaultIntegrante = {
   remisiones: [],
 }
 
-export function IdentificacionesWizard({ territorioId, microterritorio, onClose, onViewSaved }: { territorioId: string | undefined, microterritorio: string, onClose: () => void, onViewSaved?: (id: string) => void }) {
+export function IdentificacionesWizard({ 
+  territorioId, 
+  microterritorio, 
+  onClose, 
+  onViewSaved,
+  existingFicha
+}: { 
+  territorioId: string | undefined, 
+  microterritorio: string, 
+  onClose: () => void, 
+  onViewSaved?: (id: string) => void,
+  existingFicha?: any
+}) {
   const { user } = useAuth()
   const [currentStep, setCurrentStep] = useState(1)
   const [stepError, setStepError] = useState("")
@@ -63,29 +76,35 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
 
   const methods = useForm<WizardData>({
     resolver: zodResolver(wizardSchema),
-    defaultValues: {
-      estadoVisita: "1",
-      fechaDiligenciamiento: (() => {
-        const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      })(),
-      uzpe: "UZPE011",
-      departamento: "RISARALDA",
-      municipio: "PEREIRA",
-      numEBS: "",
-      prestadorPrimario: "ESE SALUD PEREIRA",
-      perfilEncuestador: user?.rol === "auxiliar" ? "auxiliar" : "otro",
-      tipoDocEncuestador: "CC",
-      numDocEncuestador: user?.documento || "",
-      fuenteAgua: [],
-      dispExcretas: [],
-      aguasResiduales: [],
-      dispResiduos: [],
-      riesgoAccidente: [],
-      vulnerabilidades: [],
-      numIntegrantes: "1",
-      integrantes: [defaultIntegrante as any]
-    }
+    defaultValues: existingFicha 
+      ? mapFichaToWizardData(
+          existingFicha,
+          user?.documento || '',
+          user?.rol === 'auxiliar' ? 'auxiliar' : 'otro'
+        ) 
+      : {
+          estadoVisita: "1",
+          fechaDiligenciamiento: (() => {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          })(),
+          uzpe: "UZPE011",
+          departamento: "RISARALDA",
+          municipio: "PEREIRA",
+          numEBS: "",
+          prestadorPrimario: "ESE SALUD PEREIRA",
+          perfilEncuestador: user?.rol === "auxiliar" ? "auxiliar" : "otro",
+          tipoDocEncuestador: "CC",
+          numDocEncuestador: user?.documento || "",
+          fuenteAgua: [],
+          dispExcretas: [],
+          aguasResiduales: [],
+          dispResiduos: [],
+          riesgoAccidente: [],
+          vulnerabilidades: [],
+          numIntegrantes: "1",
+          integrantes: [defaultIntegrante as any]
+        }
   })
 
   const { fields, append, remove } = useFieldArray({
@@ -220,6 +239,44 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
         return result
       }
       
+      // Mapa de nombre técnico → etiqueta en español
+      const fieldLabels: Record<string, string> = {
+        estadoVisita: 'Estado de visita', observacionesRechazo: 'Motivo de rechazo',
+        departamento: 'Departamento', municipio: 'Municipio', direccion: 'Dirección',
+        centroPoblado: 'Centro poblado', descripcionUbicacion: 'Descripción ubicación',
+        uzpe: 'UZPE', latitud: 'Latitud', longitud: 'Longitud',
+        numEBS: 'N° EBS', prestadorPrimario: 'Prestador primario',
+        fechaDiligenciamiento: 'Fecha de diligenciamiento',
+        tipoDocEncuestador: 'Tipo doc. encuestador', numDocEncuestador: 'N° doc. encuestador',
+        perfilEncuestador: 'Perfil encuestador',
+        tipoVivienda: 'Tipo de vivienda', matParedes: 'Material paredes',
+        matPisos: 'Material pisos', matTechos: 'Material techos',
+        numHogares: 'N° hogares', numDormitorios: 'N° dormitorios',
+        estratoSocial: 'Estrato social', hacinamiento: 'Hacinamiento',
+        fuenteAgua: 'Fuente de agua', dispExcretas: 'Disposición excretas',
+        aguasResiduales: 'Aguas residuales', dispResiduos: 'Disposición residuos',
+        riesgoAccidente: 'Riesgo de accidente', fuenteEnergia: 'Fuente de energía',
+        presenciaVectores: 'Presencia vectores', animales: 'Animales domésticos',
+        cantAnimales: 'Cantidad animales', vacunacionMascotas: 'Vacunación mascotas',
+        tipoFamilia: 'Tipo de familia', numIntegrantes: 'N° integrantes',
+        apgar: 'APGAR familiar', ecomapa: 'Ecomapa', cuidadorPrincipal: 'Cuidador principal',
+        zarit: 'Escala Zarit', vulnerabilidades: 'Vulnerabilidades',
+        // Integrante
+        primerNombre: 'Primer nombre', segundoNombre: 'Segundo nombre',
+        primerApellido: 'Primer apellido', segundoApellido: 'Segundo apellido',
+        tipoDoc: 'Tipo documento', numDoc: 'Número documento',
+        fechaNacimiento: 'Fecha de nacimiento', sexo: 'Sexo', parentesco: 'Parentesco',
+        gestante: 'Gestante', nivelEducativo: 'Nivel educativo', ocupacion: 'Ocupación',
+        regimen: 'Régimen', eapb: 'EAPB', etnia: 'Etnia',
+      }
+
+      const prettyLabel = (key: string) => {
+        // ej: "integrantes[0].primerNombre" → "Integrante 1 · Primer nombre"
+        const m = key.match(/integrantes\[(\d+)\]\.(.+)/)
+        if (m) return `Integrante ${parseInt(m[1]) + 1} → ${fieldLabels[m[2]] || m[2]}`
+        return fieldLabels[key] || key
+      }
+
       let explicitLogs: string[] = []
       if (currentStep === 4 || currentStep === 5) {
          if (errs.integrantes) explicitLogs = flattenErrors({ integrantes: errs.integrantes })
@@ -231,7 +288,10 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
          explicitLogs = flattenErrors(stepErrorFilter)
       }
 
-      setStepError(`Faltan campos obligatorios. Detalles:\n${explicitLogs.join(" | ")}`)
+      setStepError(explicitLogs.map(e => {
+        const [fieldKey, ...rest] = e.split(': ')
+        return `${prettyLabel(fieldKey)}: ${rest.join(': ')}` 
+      }).join('||'))
     }
   }
 
@@ -251,9 +311,11 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
         payload.numIntegrantes = "0"
         payload.tipoFamilia = "7" // 'Otro' o similar, el API lo ignorará de todas formas
       }
+      const method = existingFicha ? "PUT" : "POST"
+      const url = existingFicha ? `/api/identificaciones/${existingFicha.id}` : "/api/identificaciones"
 
-      const response = await fetch("/api/identificaciones", {
-        method: "POST",
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           ...payload, 
@@ -261,7 +323,8 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
           territorio: territorioId, 
           microterritorio,
           encuestadorId: user?.id,
-          userId: user?.id
+          userId: user?.id,
+          encuestadorNombreRaw: user ? `${user.nombre} ${user.apellidos}`.trim() : null
         }),
       })
       const result = await response.json()
@@ -424,8 +487,18 @@ export function IdentificacionesWizard({ territorioId, microterritorio, onClose,
 
           {/* -- Error Message -- */}
           {stepError && (
-            <div className="px-5 py-3 bg-destructive/10 text-destructive text-xs font-bold text-center border-t border-destructive/20 whitespace-pre-wrap">
-              {stepError}
+            <div className="mx-5 my-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3">
+              <p className="text-destructive text-xs font-black uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <span className="text-base">⚠️</span> Campos requeridos en este paso:
+              </p>
+              <ul className="flex flex-col gap-1">
+                {stepError.split('||').filter(Boolean).map((msg, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-destructive/90 font-semibold">
+                    <span className="mt-0.5 shrink-0">→</span>
+                    <span>{msg}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
