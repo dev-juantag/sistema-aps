@@ -14,6 +14,7 @@ model Territorio {
   nombre       String
   descripcion  String?
   activo       Boolean      @default(true)
+  whatsappLink String?
   atenciones   Atencion[]
   contratos    Contrato[]
   derivaciones Derivacion[]
@@ -46,6 +47,7 @@ model User {
   updatedAt             DateTime                  @default(now()) @updatedAt
   recoveryCode          String?
   recoveryExpires       DateTime?
+  telefono              String?
   atenciones            Atencion[]
   contratos             Contrato[]
   derivacionesRecibidas Derivacion[]              @relation("ProfesionalDerivacion")
@@ -102,7 +104,6 @@ model FichaHogar {
   id                    String       @id @default(uuid())
   consecutivo           Int          @unique @default(autoincrement())
   estadoVisita          String
-  puedeActualizarse     Boolean      @default(false)
   observacionesRechazo  String?
   departamento          String
   municipio             String
@@ -113,8 +114,6 @@ model FichaHogar {
   longitud              Float?
   fechaDiligenciamiento DateTime     @default(now())
   encuestadorId         String?
-  encuestadorNombreRaw  String?   // Nombre del encuestador tal como viene del CSV (sin usuario)
-  encuestadorDocRaw     String?   // Documento del encuestador tal como viene del CSV (sin usuario)
   fuenteAgua            Int[]
   dispExcretas          Int[]
   aguasResiduales       Int[]
@@ -152,6 +151,9 @@ model FichaHogar {
   numFamilia            String?
   numHogar              String?
   familiogramaCodigo    String?
+  encuestadorNombreRaw  String?
+  encuestadorDocRaw     String?
+  puedeActualizarse     Boolean      @default(false)
   derivaciones          Derivacion[]
   encuestador           User?        @relation(fields: [encuestadorId], references: [id])
   territorio            Territorio?  @relation(fields: [territorioId], references: [id])
@@ -179,7 +181,6 @@ model Paciente {
   fichaId                  String?
   gestante                 String       @default("NA")
   grupoPoblacional         Int[]
-  barrerasAcceso           Int[]
   intervencionesPendientes Int[]
   lactanciaMaterna         Boolean?
   lactanciaMeses           Int?
@@ -199,20 +200,17 @@ model Paciente {
   talla                    Float?
   tipoDoc                  String       @default("CC")
   updatedAt                DateTime     @default(now()) @updatedAt
-  
-  // Familiograma Relaciones
-  padreId                  String?
-  madreId                  String?
-  parejaId                 String?
-  tipoPareja               String?
-  tipoHijo                 String?
   estadoVital              String?      @default("VIVO")
-
+  madreId                  String?
+  padreId                  String?
+  parejaId                 String?
+  tipoHijo                 String?
+  tipoPareja               String?
+  barrerasAcceso           Int[]
   atenciones               Atencion[]
   derivaciones             Derivacion[]
   ficha                    FichaHogar?  @relation(fields: [fichaId], references: [id], onDelete: Cascade)
 }
-
 
 model Derivacion {
   id                 String           @id @default(uuid())

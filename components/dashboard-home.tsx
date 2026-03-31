@@ -16,6 +16,13 @@ import {
   Stethoscope,
   Baby,
   HeartPulse,
+  Home,
+  ShieldAlert,
+  AlertTriangle,
+  Heart,
+  Briefcase,
+  Layers,
+  Accessibility,
 } from "lucide-react"
 import {
   BarChart,
@@ -72,27 +79,37 @@ export function DashboardHome() {
   };
 
   const { data: atencionesData, error: errAt } = useSWR(user ? "/api/atenciones" : null, fetcher, swrOptions)
-  const { data: usuariosData, error: errUs } = useSWR(user ? "/api/users" : null, fetcher, swrOptions)
+  const { data: usuariosData, error: errUs } = useSWR(user && isAdmin ? "/api/users" : null, fetcher, swrOptions)
   const { data: programasData, error: errPr } = useSWR(user ? "/api/programas" : null, fetcher, swrOptions)
   const { data: stageData, error: errSt } = useSWR(user ? "/api/settings/stage" : null, fetcher, swrOptions)
+  
+  const programas = useMemo(() => Array.isArray(programasData) ? programasData : [], [programasData])
+  
+  const isEnfermeraJefe = useMemo(() => {
+    if (!user || user.rol !== 'profesional') return false;
+    const prog = programas.find((p: any) => p.id === user.programaId);
+    return prog ? prog.nombre.toLowerCase().includes('enfermer') : false;
+  }, [user, programas]);
+  
+  const shouldFetchIdData = user?.rol === "auxiliar" || isAdmin || isEnfermeraJefe;
+
   const { data: identificacionesData, error: errId } = useSWR(
-    user?.rol === "auxiliar" || isAdmin ? `/api/identificaciones?role=${user?.rol}&territorioId=${user?.rol === "auxiliar" ? user?.territorioId : ""}` : null,
+    shouldFetchIdData ? `/api/identificaciones?role=${user?.rol}&territorioId=${(user?.rol === "auxiliar" || isEnfermeraJefe) ? (user?.territorioId || "") : ""}` : null,
     fetcher,
     swrOptions
   )
   const { data: terrsData, error: errTerr } = useSWR("/api/territorios", fetcher, swrOptions)
   const { data: idStats } = useSWR(
-    user?.rol === "auxiliar" || isAdmin ? `/api/identificaciones/stats?role=${user?.rol}&territorioId=${user?.rol === "auxiliar" ? user?.territorioId : ""}` : null,
+    shouldFetchIdData ? `/api/identificaciones/stats?role=${user?.rol}&territorioId=${(user?.rol === "auxiliar" || isEnfermeraJefe) ? (user?.territorioId || "") : ""}` : null,
     fetcher,
     swrOptions
   )
 
-  const loading = !atencionesData || !usuariosData || !programasData || !stageData || !terrsData || ((user?.rol === "auxiliar" || isAdmin) && (!identificacionesData || !idStats))
+  const loading = !atencionesData || (isAdmin && !usuariosData) || !programasData || !stageData || !terrsData || (shouldFetchIdData && (!identificacionesData || !idStats))
   
   const atenciones = useMemo(() => Array.isArray(atencionesData) ? atencionesData : [], [atencionesData])
   const indentificaciones = useMemo(() => Array.isArray(identificacionesData) ? identificacionesData : [], [identificacionesData])
   const usuarios = useMemo(() => Array.isArray(usuariosData) ? usuariosData : [], [usuariosData])
-  const programas = useMemo(() => Array.isArray(programasData) ? programasData : [], [programasData])
   const terrs = useMemo(() => Array.isArray(terrsData) ? terrsData : [], [terrsData])
   const currentStageStart = useMemo(() => stageData?.currentStageStart || null, [stageData])
 
@@ -101,8 +118,6 @@ export function DashboardHome() {
     if (!user?.territorioId) return null;
     const fromApi = terrs.find((t: any) => t.id === user.territorioId);
     if (fromApi) return { label: fromApi.nombre, id: fromApi.codigo };
-    
-    // Si no está en BD (uso de código temporal en localstorage), busca en constantes
     return TERRITORIOS.find(t => t.id === user.territorioId);
   }, [user, terrs]);
 
@@ -132,8 +147,9 @@ export function DashboardHome() {
   const chartDataIdentificacionesRoles = useMemo(() => {
     const map: Record<string, number> = {};
     indentificaciones.forEach((idf: any) => {
-      const terrId = idf.territorioCodigo || "Sin asignar";
-      map[terrId] = (map[terrId] || 0) + 1;
+      // Priorizar el nombre del territorio, si no existe usar el código, si no "Sin asignar"
+      const terrName = idf.territorio || idf.territorioCodigo || "Sin asignar";
+      map[terrName] = (map[terrName] || 0) + 1;
     });
     return Object.keys(map).map(terr => ({
       nombre: terr,
@@ -176,7 +192,7 @@ export function DashboardHome() {
     }
   }, [filteredAtenciones, isAdmin, user])
 
-  // Top Profesionales (Solo Admin o Profesional)
+  // Top Profesionales
   const top10Profesionales = useMemo(() => {
     if (!usuarios.length) return [];
     const profs = usuarios.filter((u: any) => u.rol === "profesional" && u.activo !== false);
@@ -194,24 +210,18 @@ export function DashboardHome() {
     
     counts.sort((a: any, b: any) => {
       if (b.atencCount !== a.atencCount) return b.atencCount - a.atencCount;
-      if (a.ultimaAtencion !== b.ultimaAtencion) return a.ultimaAtencion - b.ultimaAtencion;
-      if (a.atencCount === 0 && b.atencCount === 0) {
-        if (a.id === user?.id) return -1;
-        if (b.id === user?.id) return 1;
-      }
       return 0; 
     });
 
     return counts.slice(0, TOP_N_PROFESIONALES);
   }, [usuarios, filteredAtenciones, user, programas]);
 
-
   const getKpis = () => {
     if (user?.rol === "auxiliar") {
       return [
         {
           label: "Identificaciones (Territorio)",
-          value: countsId.totalTerritorio,
+          value: idStats?.kpis?.totalFichas || 0,
           icon: <MapPin className="h-5 w-5" />,
           color: "bg-primary/10 text-primary",
         },
@@ -236,8 +246,49 @@ export function DashboardHome() {
       ]
     }
 
+    if (isEnfermeraJefe) {
+      return [
+        {
+          label: "Id. en Territorio",
+          value: idStats?.kpis?.totalFichas || 0,
+          icon: <Database className="h-5 w-5" />,
+          color: "bg-chart-2/10 text-chart-2",
+        },
+        {
+          label: "Personas Identificadas",
+          value: idStats?.kpis?.totalPacientes || 0,
+          icon: <Users className="h-5 w-5" />,
+          color: "bg-indigo-100 text-indigo-600",
+        },
+        {
+          label: "Mis Atenciones (Total)",
+          value: misAtenciones.length,
+          icon: <ClipboardList className="h-5 w-5" />,
+          color: "bg-primary/10 text-primary",
+        },
+        {
+          label: "Mis Atenc. (Hoy)",
+          value: misAtenciones.filter((a: any) => a.fecha.startsWith(today)).length,
+          icon: <TrendingUp className="h-5 w-5" />,
+          color: "bg-chart-4/10 text-chart-4",
+        }
+      ]
+    }
+
     if (isAdmin) {
       return [
+        {
+          label: "Total Hogares",
+          value: idStats?.kpis?.totalFichas || 0,
+          icon: <Home className="h-5 w-5" />,
+          color: "bg-blue-100 text-blue-600",
+        },
+        {
+          label: "Total Identificados",
+          value: idStats?.kpis?.totalPacientes || 0,
+          icon: <Users className="h-5 w-5" />,
+          color: "bg-indigo-100 text-indigo-600",
+        },
         {
           label: "Total Atenciones",
           value: filteredAtenciones.length,
@@ -245,25 +296,13 @@ export function DashboardHome() {
           color: "bg-primary/10 text-primary",
         },
         {
-          label: "Total Identificaciones",
-          value: indentificaciones.length,
-          icon: <Database className="h-5 w-5" />,
-          color: "bg-chart-2/10 text-chart-2",
-        },
-        {
           label: "Profesionales Activos",
           value: profesionalesActivos,
           icon: <Stethoscope className="h-5 w-5" />,
-          color: "bg-chart-3/10 text-chart-3",
+          color: "bg-emerald-100 text-emerald-600",
         },
         {
-          label: "Auxiliares Activos",
-          value: auxiliaresActivos,
-          icon: <Users className="h-5 w-5" />,
-          color: "bg-chart-4/10 text-chart-4",
-        },
-        {
-          label: "Atenciones Pendientes Facturar",
+          label: "Pendientes Facturar",
           value: filteredAtenciones.filter((a: any) => a.estadoFacturacion === "PENDIENTE").length,
           icon: <Database className="h-5 w-5" />,
           color: "bg-rose-100 text-rose-600",
@@ -273,19 +312,13 @@ export function DashboardHome() {
 
     return [
       {
-        label: "Mi programa",
-        value: getProgramaById(user?.programaId || "")?.nombre || "—",
-        icon: <Activity className="h-5 w-5" />,
-        color: "bg-chart-2/10 text-chart-2",
-      },
-      {
         label: "Mis atenciones",
         value: misAtenciones.length,
         icon: <ClipboardList className="h-5 w-5" />,
         color: "bg-primary/10 text-primary",
       },
       {
-        label: "Todas las atenciones de hoy",
+        label: "Atenciones Hoy",
         value: todayAtenciones.length,
         icon: <Calendar className="h-5 w-5" />,
         color: "bg-chart-3/10 text-chart-3",
@@ -351,55 +384,116 @@ export function DashboardHome() {
         ))}
       </div>
 
-      {idStats && (user?.rol === "auxiliar" || isAdmin) && (
+      {idStats && (user?.rol === "auxiliar" || isAdmin || isEnfermeraJefe) && (
         <>
           <div className="flex items-center gap-2 mt-2 border-b border-border pb-2">
             <HeartPulse className="h-6 w-6 text-destructive" />
             <h2 className="text-xl font-bold text-foreground">
-              Vigilancia Epidemiológica y Demográfica
+              Vigilancia Epidemiológica y Demográfica {isEnfermeraJefe && `(Territorio ${userTerritory?.label || ''})`}
             </h2>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
               <Baby className="mx-auto h-8 w-8 text-chart-2 mb-2" />
               <p className="text-3xl font-bold text-foreground">{idStats?.kpis?.menores5 || 0}</p>
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Primera Infancia (&lt;5 Años)</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Primera Infancia</p>
             </div>
             <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
               <Activity className="mx-auto h-8 w-8 text-destructive mb-2" />
               <p className="text-3xl font-bold text-foreground">{idStats?.kpis?.gestantes || 0}</p>
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Gestantes Activas</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Gestantes</p>
+            </div>
+            <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
+              <AlertTriangle className="mx-auto h-8 w-8 text-orange-500 mb-2" />
+              <p className="text-3xl font-bold text-foreground">{idStats?.kpis?.signosDesnutricion || 0}</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Riesgo Nutricional</p>
             </div>
             <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
               <Users className="mx-auto h-8 w-8 text-chart-4 mb-2" />
               <p className="text-3xl font-bold text-foreground">{idStats?.kpis?.mayores60 || 0}</p>
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Adultos Mayores (60+ Años)</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Vejez (60+)</p>
             </div>
           </div>
+
+          {(isAdmin || isEnfermeraJefe) && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+               <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-destructive/30">
+                 <div className="flex items-center justify-between mb-2">
+                   <ShieldAlert className="h-5 w-5 text-destructive" />
+                   <span className="text-[10px] font-bold px-2 py-0.5 bg-destructive/10 text-destructive rounded-full">ALERTA</span>
+                 </div>
+                 <p className="text-2xl font-bold text-foreground">{idStats?.kpis?.victimas || 0}</p>
+                 <p className="text-xs text-muted-foreground font-medium">Víctimas del Conflicto</p>
+                 <div className="absolute -bottom-2 -right-2 h-12 w-12 text-destructive/5 group-hover:text-destructive/10 transition-colors">
+                    <ShieldAlert className="h-full w-full" />
+                 </div>
+               </div>
+
+               <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-blue-500/30">
+                 <div className="flex items-center justify-between mb-2">
+                   <Accessibility className="h-5 w-5 text-blue-500" />
+                   <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full">INCLUSIÓN</span>
+                 </div>
+                 <p className="text-2xl font-bold text-foreground">{idStats?.kpis?.conDiscapacidad || 0}</p>
+                 <p className="text-xs text-muted-foreground font-medium">PcD (Discapacidad)</p>
+                 <div className="absolute -bottom-2 -right-2 h-12 w-12 text-blue-500/5 group-hover:text-blue-500/10 transition-colors">
+                    <Accessibility className="h-full w-full" />
+                 </div>
+               </div>
+
+               <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-rose-500/30">
+                 <div className="flex items-center justify-between mb-2">
+                   <HeartPulse className="h-5 w-5 text-rose-500" />
+                   <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-600 rounded-full">ALTA PRIORIDAD</span>
+                 </div>
+                 <p className="text-2xl font-bold text-foreground">{idStats?.kpis?.hogaresHuerfanas || 0}</p>
+                 <p className="text-xs text-muted-foreground font-medium">Enf. Huérfana o Terminal</p>
+                 <p className="text-[9px] text-muted-foreground italic mt-1">(Familias con casos)</p>
+               </div>
+
+               <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-emerald-500/30">
+                 <div className="flex items-center justify-between mb-2">
+                   <Heart className="h-5 w-5 text-emerald-500" />
+                   <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded-full">PROTECCIÓN</span>
+                 </div>
+                 <p className="text-2xl font-bold text-emerald-600">
+                   {idStats?.aseguramiento?.regimen?.find((r: any) => r.name === "SUBSIDIADO")?.value || 0}
+                 </p>
+                 <p className="text-xs text-muted-foreground font-medium">Régimen Subsidiado</p>
+               </div>
+            </div>
+          )}
 
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Pirámide Poblacional */}
             <div className="rounded-xl border border-border bg-card p-6 shadow-sm flex flex-col items-center">
-              <div className="w-full mb-4 flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold text-foreground">
-                  Pirámide Poblacional
-                </h2>
+              <div className="w-full mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Cursos de Vida y Género
+                  </h2>
+                </div>
+                <div className="flex items-center gap-3 text-[11px]">
+                   <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[#081e69]"></div>Hom.</div>
+                   <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[#eb3b5a]"></div>Muj.</div>
+                </div>
               </div>
               <div className="w-full h-[300px]">
                 {(idStats?.piramide?.length || 0) > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart layout="vertical" data={idStats?.piramide || []} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="oklch(0.9 0.02 285)" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="label" type="category" width={80} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} />
+                      <XAxis type="number" hide />
+                      <YAxis dataKey="label" type="category" width={120} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
                       <Tooltip
                         cursor={{ fill: 'transparent' }}
-                        contentStyle={{ backgroundColor: "var(--card)", borderRadius: "8px", borderColor: "var(--border)" }}
+                        contentStyle={{ backgroundColor: "var(--card)", borderRadius: "12px", border: "1px solid var(--border)", boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)" }}
+                        formatter={(value: any, name: string) => [Math.abs(value), name === "mujeres" ? "Mujeres" : "Hombres"]}
                       />
-                      <Legend />
-                      <Bar dataKey="mujeres" name="Mujeres" fill="#ec4899" radius={[0, 4, 4, 0]} />
-                      <Bar dataKey="hombres" name="Hombres" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="hombres" name="Hombres" fill="#081e69" stackId="a" radius={[0, 4, 4, 0]} barSize={20} />
+                      <Bar dataKey="mujeres" name="Mujeres" fill="#eb3b5a" stackId="a" radius={[4, 0, 0, 4]} barSize={20} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -408,48 +502,48 @@ export function DashboardHome() {
               </div>
             </div>
 
-            {/* Mapa de Densidad Territorial */}
-            <div className="rounded-xl border border-border bg-card p-6 shadow-sm flex flex-col items-center">
-              <div className="w-full mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-chart-2" />
-                  <h2 className="text-lg font-semibold text-foreground">
-                    Densidad Territorial
-                  </h2>
-                </div>
-                <div className="px-2 py-0.5 bg-chart-2/10 text-chart-2 text-[10px] uppercase font-bold rounded">
-                  Concentración
-                </div>
+            {/* Clasificación Socioeconómica y Estilo de Vida */}
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm flex flex-col">
+              <div className="w-full mb-4 flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-indigo-500" />
+                <h2 className="text-lg font-semibold text-foreground">
+                  Entorno y Vulnerabilidad
+                </h2>
               </div>
-              <div className="w-full h-[300px]">
-                {(idStats?.densidad?.length || 0) > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.9 0.02 285)" />
-                      <XAxis type="number" dataKey="x" name="Terr." hide />
-                      <YAxis type="number" dataKey="y" name="Fichas" hide />
-                      <ZAxis type="number" dataKey="z" range={[200, 3000]} name="Cant." />
-                      <Tooltip 
-                        cursor={{ strokeDasharray: '3 3' }}
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload
-                            return (
-                              <div className="bg-card border border-border p-3 rounded-lg shadow-md text-sm">
-                                <p className="font-bold text-foreground mb-1">{data.name}</p>
-                                <p className="text-muted-foreground">Fichas en la zona: <span className="font-bold text-chart-2">{data.z}</span></p>
-                              </div>
-                            )
-                          }
-                          return null
-                        }}
-                      />
-                      <Scatter name="Territorios" data={idStats?.densidad || []} fill="oklch(0.65 0.15 calc(var(--brand-hue) - 85))" />
-                    </ScatterChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <p className="text-muted-foreground mt-20 text-center text-sm">Sin datos para mostrar de territorios.</p>
-                )}
+              
+              <div className="grid grid-cols-2 gap-4 flex-1">
+                <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold mb-2">Estratos predominantes</p>
+                  <div className="space-y-2">
+                    {idStats?.estratos?.slice(0, 3).map((e: any) => (
+                      <div key={e.name} className="flex items-center justify-between">
+                         <span className="text-sm font-medium">Estrato {e.name}</span>
+                         <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-bold">{e.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-emerald-50/50 border border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900">
+                  <p className="text-[10px] text-emerald-700 dark:text-emerald-500 uppercase font-bold mb-2">Hábitos Saludables</p>
+                  <div className="flex flex-col items-center justify-center pt-2">
+                    <Heart className="h-8 w-8 text-emerald-500 animate-pulse mb-1" />
+                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{idStats?.kpis?.habitosSaludables || 0}</p>
+                    <p className="text-[10px] text-emerald-600 text-center">Realizan actividad física</p>
+                  </div>
+                </div>
+
+                <div className="col-span-2 p-4 rounded-lg bg-orange-50/50 border border-orange-100 dark:bg-orange-950/20 dark:border-orange-900">
+                   <p className="text-[10px] text-orange-700 dark:text-orange-500 uppercase font-bold mb-2">Situaciones de Vulnerabilidad</p>
+                   <div className="flex flex-wrap gap-2">
+                     {idStats?.vulnerabilidades?.filter((v: any) => !v.name.toLowerCase().includes('ningun')).slice(0, 4).map((v: any) => (
+                       <div key={v.name} className="flex items-center gap-2 bg-white/80 dark:bg-black/20 px-3 py-1.5 rounded-md border border-orange-200 dark:border-orange-900 shadow-sm">
+                          <span className="text-[11px] font-medium leading-tight max-w-[120px]">{v.name}</span>
+                          <span className="text-xs font-bold text-orange-600">{v.value}</span>
+                       </div>
+                     ))}
+                   </div>
+                </div>
               </div>
             </div>
           </div>
@@ -462,17 +556,17 @@ export function DashboardHome() {
           <div className="mb-4 flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold text-foreground">
-              {user?.rol === "auxiliar" ? "Estado de Identificaciones del Territorio" : "Todas las Atenciones por Programa"}
+              {user?.rol === "auxiliar" || isEnfermeraJefe ? "Estado de Identificaciones del Territorio" : "Todas las Atenciones por Programa"}
             </h2>
           </div>
-          {(user?.rol === "auxiliar" ? chartDataIdAuxiliar : chartDataAtenciones).length === 0 ? (
+          {(user?.rol === "auxiliar" || isEnfermeraJefe ? chartDataIdAuxiliar : chartDataAtenciones).length === 0 ? (
             <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
               No hay datos para mostrar.
             </div>
           ) : (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={user?.rol === "auxiliar" ? chartDataIdAuxiliar : chartDataAtenciones} margin={{ top: 5, right: 10, left: -20, bottom: 40 }}>
+                <BarChart data={user?.rol === "auxiliar" || isEnfermeraJefe ? chartDataIdAuxiliar : chartDataAtenciones} margin={{ top: 5, right: 10, left: -20, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.90 0.02 285)" />
                   <XAxis
                     dataKey="nombre"
@@ -491,7 +585,7 @@ export function DashboardHome() {
                       fontSize: "13px",
                     }}
                   />
-                  <Bar dataKey={user?.rol === "auxiliar" ? "cantidad" : "atenciones"} name={user?.rol === "auxiliar" ? "Cantidad" : "Atenciones"} fill="oklch(0.50 0.18 285)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey={user?.rol === "auxiliar" || isEnfermeraJefe ? "cantidad" : "atenciones"} name={user?.rol === "auxiliar" || isEnfermeraJefe ? "Cantidad" : "Atenciones"} fill="oklch(0.50 0.18 285)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -540,26 +634,26 @@ export function DashboardHome() {
         ) : (
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
-              {user?.rol === "auxiliar" ? <Database className="h-5 w-5 text-primary" /> : <ClipboardList className="h-5 w-5 text-primary" />}
+              {user?.rol === "auxiliar" || isEnfermeraJefe ? <Database className="h-5 w-5 text-primary" /> : <ClipboardList className="h-5 w-5 text-primary" />}
               <h2 className="text-lg font-semibold text-foreground">
-                {user?.rol === "auxiliar" 
+                {user?.rol === "auxiliar" || isEnfermeraJefe
                   ? "Últimas Identificaciones del Territorio"
                   : `Atenciones recientes del programa`}
               </h2>
             </div>
-            {(user?.rol === "auxiliar" ? recentIdentificaciones : recentAtenciones).length === 0 ? (
+            {(user?.rol === "auxiliar" || isEnfermeraJefe ? recentIdentificaciones : recentAtenciones).length === 0 ? (
               <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                No hay {user?.rol === "auxiliar" ? "identidficaciones" : "atenciones"} registradas.
+                No hay {user?.rol === "auxiliar" || isEnfermeraJefe ? "identificaciones" : "atenciones"} registradas.
               </div>
             ) : (
               <ul className="flex flex-col gap-3">
-                {(user?.rol === "auxiliar" ? recentIdentificaciones : recentAtenciones).map((a: any) => (
+                {(user?.rol === "auxiliar" || isEnfermeraJefe ? recentIdentificaciones : recentAtenciones).map((a: any) => (
                   <li
                     key={a.id}
                     className="flex items-center gap-4 rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors"
                   >
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                      {(user?.rol === "auxiliar" ? (a.direccion || "A") : a.pacienteNombre)
+                      {((user?.rol === "auxiliar" || isEnfermeraJefe) ? (a.direccion || "A") : a.pacienteNombre)
                         .split(" ")
                         .map((w: string) => w[0])
                         .join("")
@@ -568,15 +662,15 @@ export function DashboardHome() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">
-                        {user?.rol === "auxiliar" ? a.direccion : a.pacienteNombre}
+                        {(user?.rol === "auxiliar" || isEnfermeraJefe) ? a.direccion : a.pacienteNombre}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {user?.rol === "auxiliar"
+                        {(user?.rol === "auxiliar" || isEnfermeraJefe)
                           ? `En: ${a.microterritorio} — ${getRelativeTime(a.fechaDiligenciamiento)}`
                           : `Por: ${a.profesionalNombre}`
                         }
                       </p>
-                      {(user?.rol === "auxiliar" && a.encuestador) && (
+                      {((user?.rol === "auxiliar" || isEnfermeraJefe) && a.encuestador) && (
                         <p className="text-[11px] text-muted-foreground/80 mt-0.5">
                           Por: <span className="font-medium text-foreground/80">{a.encuestador?.nombre} {a.encuestador?.apellidos}</span> - <span>C.C. {a.encuestador?.documento || 'No disp.'}</span>
                         </p>
@@ -595,71 +689,71 @@ export function DashboardHome() {
           {/* Recientes Atenciones */}
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
              <div className="mb-4 flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold text-foreground">Atenciones Recientes Globales</h2>
-            </div>
+               <ClipboardList className="h-5 w-5 text-primary" />
+               <h2 className="text-lg font-semibold text-foreground">Atenciones Recientes Globales</h2>
+             </div>
              {recentAtenciones.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                No hay atenciones registradas.
-              </div>
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {recentAtenciones.map((a: any) => (
-                  <li key={a.id} className="flex items-center gap-4 rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors">
-                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                      {a.pacienteNombre.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{a.pacienteNombre}</p>
-                      <p className="text-xs text-muted-foreground">
-                         {getProgramaById(a.programaId)?.nombre} — {getRelativeTime(a.createdAtISO, a.fecha)}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                        Por: <span className="font-medium text-foreground/80">{a.profesionalNombre}</span>
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+               <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+                 No hay atenciones registradas.
+               </div>
+             ) : (
+               <ul className="flex flex-col gap-3">
+                 {recentAtenciones.map((a: any) => (
+                   <li key={a.id} className="flex items-center gap-4 rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                       {a.pacienteNombre.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                     </div>
+                     <div className="flex-1 min-w-0">
+                       <p className="text-sm font-medium text-foreground truncate">{a.pacienteNombre}</p>
+                       <p className="text-xs text-muted-foreground">
+                          {getProgramaById(a.programaId)?.nombre} — {getRelativeTime(a.createdAtISO, a.fecha)}
+                       </p>
+                       <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+                         Por: <span className="font-medium text-foreground/80">{a.profesionalNombre}</span>
+                       </p>
+                     </div>
+                   </li>
+                 ))}
+               </ul>
+             )}
           </div>
           {/* Recientes Identificaciones */}
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
              <div className="mb-4 flex items-center gap-2">
-              <Database className="h-5 w-5 text-chart-2" />
-              <h2 className="text-lg font-semibold text-foreground">Identificaciones Recientes Globales</h2>
-            </div>
+               <Database className="h-5 w-5 text-chart-2" />
+               <h2 className="text-lg font-semibold text-foreground">Identificaciones Recientes Globales</h2>
+             </div>
              {recentIdentificaciones.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                No hay identificaciones registradas.
-              </div>
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {recentIdentificaciones.map((a: any) => (
-                  <li key={a.id} className="flex items-center gap-4 rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors">
-                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-chart-2/10 text-xs font-bold text-chart-2">
-                      {(a.direccion || "A").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{a.direccion}</p>
-                      <p className="text-xs text-muted-foreground">
-                        En: {a.territorio} — {getRelativeTime(a.fechaDiligenciamiento)}
-                      </p>
-                      {a.encuestador && (
-                        <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                          Por: <span className="font-medium text-foreground/80">{a.encuestador?.nombre} {a.encuestador?.apellidos}</span>
-                        </p>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+               <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+                 No hay identificaciones registradas.
+               </div>
+             ) : (
+               <ul className="flex flex-col gap-3">
+                 {recentIdentificaciones.map((a: any) => (
+                   <li key={a.id} className="flex items-center gap-4 rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-chart-2/10 text-xs font-bold text-chart-2">
+                       {(a.direccion || "A").split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                     </div>
+                     <div className="flex-1 min-w-0">
+                       <p className="text-sm font-medium text-foreground truncate">{a.direccion}</p>
+                       <p className="text-xs text-muted-foreground">
+                         En: {a.territorio} — {getRelativeTime(a.fechaDiligenciamiento)}
+                       </p>
+                       {a.encuestador && (
+                         <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+                           Por: <span className="font-medium text-foreground/80">{a.encuestador?.nombre} {a.encuestador?.apellidos}</span>
+                         </p>
+                       )}
+                     </div>
+                   </li>
+                 ))}
+               </ul>
+             )}
           </div>
         </div>
       )}
 
-      {/* Top 10 Profesionales (Solo Profs o Admin) */}
+      {/* Top 10 Profesionales */}
       {user?.rol !== "auxiliar" && (
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm mx-auto w-full lg:w-3/4 xl:w-2/3">
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -715,13 +809,6 @@ export function DashboardHome() {
                     </td>
                   </tr>
                 ))}
-                {top10Profesionales.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="py-6 text-center text-muted-foreground">
-                      No hay profesionales registrados en el sistema.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>

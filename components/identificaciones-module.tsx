@@ -200,7 +200,7 @@ export function IdentificacionesModule() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto w-full pb-10">
+    <div className="flex flex-col gap-6 w-full pb-10">
       
       {/* HEADER PRINCIPAL */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 bg-card p-6 rounded-3xl shadow-sm border border-border print:hidden">
@@ -234,7 +234,7 @@ export function IdentificacionesModule() {
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             {user?.rol === 'auxiliar' ? 'Descargar Mis Identificaciones' : 'Descargar Todo'}
           </button>
-          {isAuxiliar && (
+          {(isAuxiliar || isSuperAdmin) && (
             <button
               onClick={() => setIsWizardOpen(true)}
               className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer shadow-sm hover:shadow-md"

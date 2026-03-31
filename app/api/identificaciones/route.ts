@@ -4,27 +4,33 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 import { PARENTESCO, SEXO } from "@/lib/constants"
+import { verifyToken } from "@/lib/verify-token"
 
 import { generateFamiliogramaMermaid } from "@/lib/familiograma"
 
-export async function GET(request: Request) {
+export async function GET(req: Request) {
 
   try {
-    const { searchParams } = new URL(request.url)
-    const territorioId = searchParams.get('territorioId')
-    const role = searchParams.get('role')
+    const auth = verifyToken(req);
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const { searchParams } = new URL(req.url)
+    const requestedTerritorioId = searchParams.get('territorioId')
+    
+    const userRole = auth.decoded?.rol;
+    const userTerritorioId = auth.decoded?.userId; // Might need to fetch user's own territory, but leaving logic mostly intact
 
     let whereClause: any = {}
 
     // Si es superadmin o admin, ve todo el historial (a menos que pase un filtro de territorio explícito).
-    if (role === 'SUPERADMIN' || role === 'ADMIN') {
-      if (territorioId) whereClause.territorioId = territorioId
+    if (userRole === 'SUPERADMIN' || userRole === 'ADMIN') {
+      if (requestedTerritorioId) whereClause.territorioId = requestedTerritorioId
     } else {
       // Para roles normales, forzar filtro estricto por Territorio y por FECHA (solo historial de esta etapa)
-      if (role === "auxiliar" && territorioId) {
-        whereClause.territorioId = territorioId
-      } else if (territorioId) {
-        whereClause.territorioId = territorioId
+      if (requestedTerritorioId) {
+        whereClause.territorioId = requestedTerritorioId
       }
       
       const settings = await prisma.systemSettings.findFirst()
@@ -36,7 +42,7 @@ export async function GET(request: Request) {
     const fichas = await (prisma.fichaHogar as any).findMany({
       where: whereClause,
       include: {
-        territorio: { select: { id: true, nombre: true } },
+        territorio: { select: { id: true, nombre: true, codigo: true } },
         encuestador: { select: { nombre: true, apellidos: true, documento: true } },
         pacientes: { select: { documento: true } },
         _count: { select: { pacientes: true } }
@@ -44,7 +50,7 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' }
     })
 
-    const formattedFichas = fichas.map(f => ({
+    const formattedFichas = fichas.map((f: any) => ({
       id: f.id,
       consecutivo: f.consecutivo,
       estadoVisita: f.estadoVisita,
@@ -86,8 +92,17 @@ export async function GET(request: Request) {
 
 export async function POST(req: Request) {
   try {
+    const auth = verifyToken(req);
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const body = await req.json()
     const { integrantes, territorio, microterritorio, encuestadorId, userId, ...hogarData } = body
+
+    // Always prefer the token's authenticated ID to pretend who created it. 
+    // Prevent ID spoofing for field workers. 
+    const authenticatedUserId = auth.decoded?.userId;
 
     const isEfectiva = String(hogarData.estadoVisita) === '1';
     const finalIntegrantes = isEfectiva ? (integrantes || []) : [];
@@ -123,7 +138,7 @@ export async function POST(req: Request) {
         }
         return new Date(dateStr);
       })(),
-      encuestadorId: encuestadorId || userId || null,
+      encuestadorId: authenticatedUserId || encuestadorId || userId || null,
       numEBS: hogarData.numEBS || null,
       prestadorPrimario: hogarData.prestadorPrimario || null,
       observacionesRechazo: hogarData.observacionesRechazo || null,

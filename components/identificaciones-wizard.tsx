@@ -406,7 +406,7 @@ export function IdentificacionesWizard({
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col mb-10 overflow-hidden rounded-3xl border border-border shadow-md bg-card">
+    <div className="w-full flex flex-col mb-10 overflow-hidden rounded-3xl border border-border shadow-md bg-card">
       <FormProvider {...methods}>
         <form onSubmit={methods.handleSubmit(onSubmit as any, onFormError)} className="w-full flex flex-col relative">
 

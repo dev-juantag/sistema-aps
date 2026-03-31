@@ -17,19 +17,21 @@ import {
   FileText,
   BarChart3,
   Map,
+  MapPinned,
   Database,
 } from "lucide-react"
 import { DashboardHome } from "@/components/dashboard-home"
 import { AtencionesModule } from "@/components/atenciones-module"
 import { AdminUsuarios } from "@/components/admin-usuarios"
 import { AdminReportes } from "@/components/admin-reportes"
-import { AdminReportesId } from "@/components/admin-reportes-id"
 import { AdminProgramas } from "@/components/admin-programas"
 import { AdminTerritorios } from "@/components/admin-territorios"
 import { AdminPacientes } from "@/components/admin-pacientes"
 import { IdentificacionesModule } from "@/components/identificaciones-module"
+import { MiTerritorioModule } from "@/components/mi-territorio-module"
+import { AdminConsolidadoTerritorios } from "@/components/admin-consolidado-territorios"
 
-type View = "inicio" | "atenciones" | "usuarios" | "territorios" | "reportes-atenciones" | "reportes-identificaciones" | "programas" | "pacientes" | "identificaciones"
+type View = "inicio" | "atenciones" | "usuarios" | "territorios" | "reportes" | "programas" | "pacientes" | "identificaciones" | "mi-territorio" | "consolidado-territorios"
 
 interface NavItem {
   id: View
@@ -64,12 +66,19 @@ export function Dashboard() {
     navItems.push({ id: "identificaciones", label: "Identificaciones", icon: <Database className="h-5 w-5" /> })
   }
 
+  if (user?.rol === "profesional" || user?.rol === "auxiliar") {
+    navItems.push({ id: "mi-territorio", label: "Mi Territorio", icon: <MapPinned className="h-5 w-5" /> })
+  }
+
+  if (isAdmin || user?.rol === "superadmin") {
+    navItems.push({ id: "consolidado-territorios", label: "Consolidado Territorios", icon: <MapPinned className="h-5 w-5" /> })
+  }
+
   const adminNavItems: NavItem[] = [
     { id: "usuarios", label: "Usuarios", icon: <Users className="h-5 w-5" />, adminOnly: true },
     { id: "territorios", label: "Territorios", icon: <Map className="h-5 w-5" />, adminOnly: true },
     { id: "programas", label: "Programas", icon: <Settings className="h-5 w-5" />, adminOnly: true },
-    { id: "reportes-identificaciones", label: "Rep. Identificaciones", icon: <BarChart3 className="h-5 w-5" />, adminOnly: true },
-    { id: "reportes-atenciones", label: "Rep. Atenciones", icon: <BarChart3 className="h-5 w-5" />, adminOnly: true },
+    { id: "reportes", label: "Reportes", icon: <BarChart3 className="h-5 w-5" />, adminOnly: true },
     { id: "pacientes", label: "Pacientes", icon: <FileText className="h-5 w-5" />, adminOnly: true },
   ]
 
@@ -83,14 +92,16 @@ export function Dashboard() {
         return <AtencionesModule />
       case "identificaciones":
         return <IdentificacionesModule />
+      case "mi-territorio":
+        return <MiTerritorioModule />
+      case "consolidado-territorios":
+        return isAdmin ? <AdminConsolidadoTerritorios /> : <DashboardHome />
       case "usuarios":
         return isAdmin ? <AdminUsuarios /> : null
       case "territorios":
         return isAdmin ? <AdminTerritorios /> : null
-      case "reportes-atenciones":
+      case "reportes":
         return isAdmin ? <AdminReportes /> : null
-      case "reportes-identificaciones":
-        return isAdmin ? <AdminReportesId /> : null
       case "programas":
         return isAdmin ? <AdminProgramas /> : null
       case "pacientes":

@@ -1,9 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { verifyToken } from "@/lib/verify-token";
 
 export async function POST(req: Request) {
   try {
+    const auth = verifyToken(req);
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    
+    // Solo SUPERADMIN o ADMIN pueden gestionar contratos
+    if (auth.decoded?.rol !== "SUPERADMIN" && auth.decoded?.rol !== "ADMIN") {
+      return NextResponse.json({ error: "No autorizado para gestionar contratos." }, { status: 403 });
+    }
+
     const data = await req.json();
     const { 
       documento, email, nombre, apellidos, rol, // Datos del usuario
@@ -43,7 +54,7 @@ export async function POST(req: Request) {
           where: {
             userId: user.id,
             estado: {
-              notIn: ["FINALIZADO", "RECHAZADA"]
+              notIn: ["FINALIZADO"] // Eliminado el tipo "RECHAZADA" para que cumpla con el type de Prisma
             }
           }
         });
@@ -79,11 +90,20 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  // Retorna todos los contratos, independientemente de si son historicos o activos
   try {
+    const auth = verifyToken(req);
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    // Solo SUPERADMIN o ADMIN pueden consultar lista de contratos global
+    if (auth.decoded?.rol !== "SUPERADMIN" && auth.decoded?.rol !== "ADMIN") {
+      return NextResponse.json({ error: "No autorizado para ver contratos." }, { status: 403 });
+    }
+
     const contratos = await prisma.contrato.findMany({
       include: {
-        user: true,
+        user: { select: { nombre: true, apellidos: true, documento: true, email: true } },
         territorio: true,
       },
       orderBy: { createdAt: 'desc' }

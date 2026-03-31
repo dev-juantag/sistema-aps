@@ -54,7 +54,7 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
         <div className="text-center px-4 flex-1">
           <h1 className="font-black text-3xl uppercase tracking-widest">Identificación APS</h1>
           <p className="font-bold text-lg mt-2 tracking-widest text-gray-600">FICHA OFICIAL NO. {ficha.consecutivo || ficha.id?.substring(0,8)}</p>
-          <p className="mt-1 font-mono text-sm text-gray-500">Documento impreso el {new Date().toLocaleString('es-CO')}</p>
+          <p className="mt-1 font-sans text-sm text-gray-500">Documento impreso el {new Date().toLocaleString('es-CO')}</p>
         </div>
         <img src="/logo-gobernacion-risaralda.png" alt="Logo 2" className="w-24 h-24 border border-gray-50 bg-gray-50 shrink-0" />
       </div>
@@ -81,7 +81,7 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
                 <tr><Th>Municipio</Th><Td>{ficha.municipio}</Td></tr>
                 <tr><Th>Territorio / Micro</Th><Td>{typeof ficha.territorio === 'object' && ficha.territorio ? `${ficha.territorio.codigo} | ${ficha.territorio.nombre}` : (ficha.territorio || ficha.territorioId)} / {ficha.microterritorio}</Td></tr>
                 <tr><Th>Dirección</Th><Td>{ficha.direccion}</Td></tr>
-                <tr><Th>GPS</Th><Td className="font-mono text-xs">{(ficha.latitud != null && ficha.longitud != null) ? `Lat: ${ficha.latitud}, Lng: ${ficha.longitud}` : 'Sin coordenadas'}</Td></tr>
+                <tr><Th>GPS</Th><Td className="font-sans text-xs">{(ficha.latitud != null && ficha.longitud != null) ? `Lat: ${ficha.latitud}, Lng: ${ficha.longitud}` : 'Sin coordenadas'}</Td></tr>
               </tbody>
             </table>
           </div>
@@ -113,8 +113,8 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
             <table className={tblCls}>
               <tbody>
                 <tr><Th>Código de Ficha Física</Th><Td>{ficha.codFicha || 'N/A'}</Td></tr>
-                <tr><Th>Código / Número de Hogar</Th><Td className="font-mono">{ficha.numHogar || 'N/A'}</Td></tr>
-                <tr><Th>Código / Número de Familia</Th><Td className="font-mono">{ficha.numFamilia || 'N/A'}</Td></tr>
+                <tr><Th>Código / Número de Hogar</Th><Td className="font-sans">{ficha.numHogar || 'N/A'}</Td></tr>
+                <tr><Th>Código / Número de Familia</Th><Td className="font-sans">{ficha.numFamilia || 'N/A'}</Td></tr>
                 <tr><Th>Código UZPE</Th><Td>{ficha.uzpe || 'N/A'}</Td></tr>
               </tbody>
             </table>
@@ -128,7 +128,7 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
                 <tr><Th>Clase de Centro Poblado</Th><Td>{ficha.centroPoblado || 'N/A'}</Td></tr>
                 <tr><Th>Dirección</Th><Td>{ficha.direccion}</Td></tr>
                 <tr><Th>Descripción de Ubicación</Th><Td>{ficha.descripcionUbicacion || 'N/A'}</Td></tr>
-                <tr><Th>Georreferenciación (GPS)</Th><Td className="font-mono text-xs">{(ficha.latitud != null && ficha.longitud != null) ? `Lat: ${ficha.latitud}, Lng: ${ficha.longitud}` : 'Sin coordenadas registradas'}</Td></tr>
+                <tr><Th>Georreferenciación (GPS)</Th><Td className="font-sans text-xs">{(ficha.latitud != null && ficha.longitud != null) ? `Lat: ${ficha.latitud}, Lng: ${ficha.longitud}` : 'Sin coordenadas registradas'}</Td></tr>
               </tbody>
             </table>
           </div>
@@ -296,7 +296,7 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
       <div className="mt-8 text-center text-xs text-gray-500 uppercase italic pt-4" style={{ borderTop: '2px solid black', pageBreakInside: 'avoid' }}>
         <p className="font-bold">** DOCUMENTO DE CARÁCTER CONFIDENCIAL Y RESTRINGIDO **</p>
         <p className="mt-1 normal-case text-[10px]">Los datos de salud e identificación familiar (APS) pertenecen al sistema departamental y su uso está regulado por la Ley de Protección de Datos Personales.</p>
-        <p className="mt-1 font-mono text-[9px]">{ficha.id}</p>
+        <p className="mt-1 font-sans text-[9px]">{ficha.id}</p>
       </div>
     </div>
   )

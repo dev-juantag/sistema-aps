@@ -106,7 +106,7 @@ export default function ResumenFicha({
             </button>
           )}
 
-          {user?.rol === 'auxiliar' && ficha.puedeActualizarse && onGoToEdit && (
+          {(user?.rol === 'auxiliar' || isSuperAdmin) && ficha.puedeActualizarse && onGoToEdit && (
             <button
               onClick={onGoToEdit}
               className="flex items-center gap-2 px-4 py-2 bg-amber-400 text-amber-900 rounded-full font-black text-sm shadow hover:bg-amber-500 transition-colors"
@@ -179,7 +179,7 @@ export default function ResumenFicha({
                 <p className="text-[10px] font-black text-gray-400 tracking-wider uppercase mb-1">Encuestador Creador</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-bold text-gray-800 text-sm uppercase">{nombreEncuestador}</span>
-                  <span className="bg-blue-50 text-blue-700 border border-blue-100 text-[10px] px-2 py-0.5 rounded font-mono font-bold tracking-wide">
+                  <span className="bg-blue-50 text-blue-700 border border-blue-100 text-[10px] px-2 py-0.5 rounded font-sans font-bold tracking-wide">
                     C.C. {docEncuestador}
                   </span>
                 </div>

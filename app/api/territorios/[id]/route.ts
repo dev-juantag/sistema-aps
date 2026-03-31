@@ -9,13 +9,14 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await req.json();
-    const { codigo, nombre, descripcion, activo } = body;
+    const { codigo, nombre, descripcion, activo, whatsappLink } = body;
 
     const dataToUpdate: any = {};
     if (codigo !== undefined) dataToUpdate.codigo = codigo.toUpperCase();
     if (nombre !== undefined) dataToUpdate.nombre = nombre;
     if (descripcion !== undefined) dataToUpdate.descripcion = descripcion;
     if (activo !== undefined) dataToUpdate.activo = activo;
+    if (whatsappLink !== undefined) dataToUpdate.whatsappLink = whatsappLink;
 
     const updated = await prisma.territorio.update({
       where: { id },

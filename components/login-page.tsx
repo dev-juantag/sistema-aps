@@ -193,7 +193,7 @@ const handleResetSubmit = async (e: React.FormEvent) => {
 
               <div className="flex flex-col gap-2">
                 <label htmlFor="password" className="text-sm font-medium text-foreground">
-                  Contrasena
+                  Contraseña
                 </label>
                 <div className="relative">
                   <input
@@ -202,14 +202,14 @@ const handleResetSubmit = async (e: React.FormEvent) => {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Ingrese su contrasena"
+                    placeholder="Ingrese su contraseña"
                     className="h-11 w-full rounded-lg border border-input bg-background px-4 pr-11 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>

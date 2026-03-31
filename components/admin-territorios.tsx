@@ -11,6 +11,7 @@ interface Territorio {
   codigo: string
   nombre: string
   descripcion?: string | null
+  whatsappLink?: string | null
   activo?: boolean
 }
 
@@ -154,13 +155,14 @@ export function AdminTerritorios() {
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Código</th>
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Nombre</th>
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Descripción</th>
+                <th className="px-4 py-3 text-center font-semibold text-muted-foreground">Enlace WhatsApp</th>
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground w-32">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={5} className="p-8 text-center text-muted-foreground">
                     No se encontraron territorios.
                   </td>
                 </tr>
@@ -171,6 +173,15 @@ export function AdminTerritorios() {
                     <td className="px-4 py-3">{t.nombre}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {t.descripcion || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {t.whatsappLink ? (
+                        <a href={t.whatsappLink} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline text-xs">
+                          Abrir WhatsApp
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {(user?.rol === "superadmin" || user?.rol === "admin") && (
@@ -226,6 +237,7 @@ function TerritorioFormModal({ territorio, onClose, onSave }: any) {
   const [codigo, setCodigo] = useState(territorio?.codigo || "")
   const [nombre, setNombre] = useState(territorio?.nombre || "")
   const [descripcion, setDescripcion] = useState(territorio?.descripcion || "")
+  const [whatsappLink, setWhatsappLink] = useState(territorio?.whatsappLink || "")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -237,6 +249,7 @@ function TerritorioFormModal({ territorio, onClose, onSave }: any) {
       codigo,
       nombre,
       descripcion,
+      whatsappLink,
     })
     setIsSubmitting(false)
   }
@@ -292,6 +305,17 @@ function TerritorioFormModal({ territorio, onClose, onSave }: any) {
               value={descripcion}
               onChange={(e) => setDescripcion(e.target.value)}
               className="w-full rounded-xl border border-input bg-background p-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all resize-none"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-semibold text-foreground">Enlace Grupo de WhatsApp (Opcional)</label>
+            <input
+              type="url"
+              placeholder="Ej. https://chat.whatsapp.com/..."
+              value={whatsappLink}
+              onChange={(e) => setWhatsappLink(e.target.value)}
+              className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all"
             />
           </div>
 

@@ -86,7 +86,7 @@
 
 @theme inline {
   --font-sans: var(--font-poppins), "Poppins", sans-serif;
-  --font-mono: "Geist Mono", "Geist Mono Fallback";
+  --font-mono: var(--font-poppins), "Poppins", sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -130,7 +130,10 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+  }
+  .font-mono {
+    font-family: var(--font-poppins), "Poppins", sans-serif !important;
   }
 }
 

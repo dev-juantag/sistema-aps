@@ -75,7 +75,7 @@ export default function Step1InfoGeneral() {
             Capturar coordenadas GPS
           </button>
           {lat && lng && (
-            <p className="text-[11px] font-mono px-2 py-1 rounded" style={{ color: '#0a8c32', background: '#e8f5ec' }}>
+            <p className="text-[11px] font-sans px-2 py-1 rounded" style={{ color: '#0a8c32', background: '#e8f5ec' }}>
               ✓ {lat}, {lng}
             </p>
           )}

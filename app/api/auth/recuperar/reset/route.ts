@@ -27,14 +27,40 @@ export async function POST(req: Request) {
 
     // Doble verificación del código y la expiración (+10 min)
     const now = new Date()
-    const isCodeWrong = unUsuario.recoveryCode !== String(code)
     const isExpired = unUsuario.recoveryExpires < now
 
-    if (isCodeWrong || isExpired) {
+    if (isExpired) {
       return NextResponse.json(
         { error: "El código no es válido o ha expirado." },
         { status: 400 }
       )
+    }
+
+    const isCodeWrong = unUsuario.recoveryCode !== String(code)
+
+    if (isCodeWrong) {
+      const newExpiryTime = new Date(unUsuario.recoveryExpires.getTime() - (3 * 60 * 1000))
+      
+      if (newExpiryTime < now) {
+        // Expiró por demasiados intentos
+        await prisma.user.update({
+          where: { id: unUsuario.id },
+          data: { recoveryCode: null, recoveryExpires: null }
+        })
+        return NextResponse.json(
+          { error: "Demasiados intentos fallidos. Su código ha sido anulado por seguridad. Solicite uno nuevo." },
+          { status: 429 }
+        )
+      } else {
+        await prisma.user.update({
+          where: { id: unUsuario.id },
+          data: { recoveryExpires: newExpiryTime }
+        })
+        return NextResponse.json(
+          { error: "El código de verificación es incorrecto." },
+          { status: 400 }
+        )
+      }
     }
 
     // Todo bien: Hashear la nueva contraseña

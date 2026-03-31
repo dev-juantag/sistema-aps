@@ -19,7 +19,7 @@ export default function Step1Ubicacion({ coords, capture, loading }: any) {
             {coords ? (
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase">Ubicación Capturada</p>
-                <p className="text-lg font-mono tracking-tight text-slate-800 dark:text-slate-200">
+                <p className="text-lg font-sans tracking-tight text-slate-800 dark:text-slate-200">
                   {coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}
                 </p>
               </div>

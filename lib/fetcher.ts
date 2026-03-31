@@ -1,1 +1,19 @@
-export const fetcher = (url: string) => fetch(url).then((res) => res.json())
+export const fetcher = async (url: string) => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem("salud-pereira-token") : null;
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json'
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, { headers });
+  
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error || "Error fetcher SWR");
+  }
+
+  return res.json();
+}

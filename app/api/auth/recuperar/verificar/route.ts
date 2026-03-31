@@ -35,10 +35,30 @@ export async function POST(req: Request) {
 
     // Comparar el código
     if (unUsuario.recoveryCode !== String(code)) {
-      return NextResponse.json(
-        { error: "El código de verificación es incorrecto." },
-        { status: 400 }
-      )
+      // Prevención de ataques de fuerza bruta (rate limit sin estado externo)
+      // Se penaliza 3 minutos el tiempo disponible por cada intento errado.
+      const newExpiryTime = new Date(unUsuario.recoveryExpires.getTime() - (3 * 60 * 1000))
+      
+      if (newExpiryTime < now) {
+        // Expiró por demasiados intentos
+        await prisma.user.update({
+          where: { id: unUsuario.id },
+          data: { recoveryCode: null, recoveryExpires: null }
+        })
+        return NextResponse.json(
+          { error: "Demasiados intentos fallidos. Su código ha sido anulado por seguridad. Solicite uno nuevo." },
+          { status: 429 }
+        )
+      } else {
+        await prisma.user.update({
+          where: { id: unUsuario.id },
+          data: { recoveryExpires: newExpiryTime }
+        })
+        return NextResponse.json(
+          { error: "El código de verificación es incorrecto." },
+          { status: 400 }
+        )
+      }
     }
 
     return NextResponse.json(

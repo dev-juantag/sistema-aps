@@ -252,7 +252,7 @@ export default function Step6Familiograma() {
               <textarea 
                 value={internalCode}
                 onChange={(e) => handleUpdateCode(e.target.value)}
-                className="w-full h-full min-h-[400px] p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 ring-inset ring-[#081e69]/20"
+                className="w-full h-full min-h-[400px] p-4 font-sans text-sm resize-none focus:outline-none focus:ring-2 ring-inset ring-[#081e69]/20"
                 placeholder="Escribe código Mermaid aquí..."
               />
             )}

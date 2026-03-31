@@ -4,19 +4,37 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 import { capitalizeWords } from "@/lib/utils"
+import { verifyToken } from "@/lib/verify-token";
 
-export async function GET(request: Request) {
+export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const profesionalId = searchParams.get('profesionalId')
-    const role = searchParams.get('role')
+    const auth = verifyToken(req);
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
-    let whereClause: any = profesionalId ? { profesionalId } : {}
+    const { searchParams } = new URL(req.url);
+    const requestedProfesionalId = searchParams.get('profesionalId');
+    const userRole = auth.decoded?.rol;
+    const userId = auth.decoded?.userId;
 
-    if (role !== 'SUPERADMIN' && role !== 'ADMIN') {
-      const settings = await prisma.systemSettings.findFirst()
+    let whereClause: any = {};
+
+    // For non-admins, strict stage filtering
+    if (userRole !== 'SUPERADMIN' && userRole !== 'ADMIN') {
+      const settings = await prisma.systemSettings.findFirst();
       if (settings?.currentStageStart) {
-        whereClause.createdAt = { gte: settings.currentStageStart }
+        whereClause.createdAt = { gte: settings.currentStageStart };
+      }
+      
+      // If user is precisely PROFESIONAL, force scope to themselves
+      if (userRole === "PROFESIONAL") {
+        whereClause.profesionalId = userId;
+      }
+    } else {
+      // Admins can filter by specific profesional if they want
+      if (requestedProfesionalId) {
+        whereClause.profesionalId = requestedProfesionalId;
       }
     }
 
@@ -30,7 +48,7 @@ export async function GET(request: Request) {
       orderBy: {
         createdAt: 'desc'
       }
-    })
+    });
 
     const formattedAtenciones = atenciones.map(a => ({
       id: a.id,
@@ -51,21 +69,26 @@ export async function GET(request: Request) {
       fecha: a.createdAt.toISOString().split('T')[0],
       createdAtISO: a.createdAt.toISOString(),
       estadoFacturacion: a.estadoFacturacion,
-    }))
+    }));
 
-    return NextResponse.json(formattedAtenciones)
+    return NextResponse.json(formattedAtenciones);
 
   } catch (error) {
-    console.error("GET ATENCIONES ERROR:", error)
+    console.error("GET ATENCIONES ERROR:", error);
     return NextResponse.json(
       { error: "Error al obtener atenciones" },
       { status: 500 }
-    )
+    );
   }
 }
 
 export async function POST(req: Request) {
   try {
+    const auth = verifyToken(req);
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const body = await req.json()
 
     let {
@@ -77,9 +100,15 @@ export async function POST(req: Request) {
       direccion,
       fechaNacimiento,
       nota,
-      profesionalId,
+      profesionalId, // Extracted but we will enforce it via JWT
       programaId,
     } = body
+
+    // Prevent ID Spoofing by enforcing authenticated user ID
+    const authenticatedUserId = auth.decoded?.userId;
+    const finalProfesionalId = auth.decoded?.rol === "SUPERADMIN" || auth.decoded?.rol === "ADMIN" 
+      ? (profesionalId || authenticatedUserId) 
+      : authenticatedUserId;
 
     let nombres = "";
     let apellidos = "";
@@ -136,7 +165,7 @@ export async function POST(req: Request) {
     const nuevaAtencion = await prisma.atencion.create({
       data: {
         pacienteId: paciente.id,
-        profesionalId,
+        profesionalId: finalProfesionalId,
         programaId,
         nota,
       },

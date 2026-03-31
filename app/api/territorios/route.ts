@@ -20,7 +20,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { codigo, nombre, descripcion } = body;
+    const { codigo, nombre, descripcion, whatsappLink } = body;
 
     const existing = await prisma.territorio.findUnique({
       where: { codigo },
@@ -38,6 +38,7 @@ export async function POST(req: Request) {
         codigo: codigo.toUpperCase(),
         nombre,
         descripcion,
+        whatsappLink
       },
     });
 

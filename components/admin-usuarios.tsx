@@ -14,6 +14,7 @@ interface User {
   apellidos: string
   documento: string
   email: string
+  telefono?: string
   rol: Role
   programaId?: string | null
   territorioId?: string | null
@@ -264,6 +265,7 @@ export function AdminUsuarios() {
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 text-left">Nombre</th>
                 <th className="px-4 py-3 text-left">Documento</th>
+                <th className="px-4 py-3 text-left">Celular</th>
                 <th className="px-4 py-3 text-left">Email</th>
                 <th className="px-4 py-3 text-left">Rol</th>
                 <th className="px-4 py-3 text-left">Territorio</th>
@@ -282,6 +284,7 @@ export function AdminUsuarios() {
                       {u.nombre} {u.apellidos}
                     </td>
                     <td className="px-4 py-3">{u.documento}</td>
+                    <td className="px-4 py-3">{u.telefono || "—"}</td>
                     <td className="px-4 py-3">{u.email}</td>
                     <td className="px-4 py-3 capitalize">
                       {u.rol}
@@ -350,7 +353,7 @@ export function AdminUsuarios() {
   )
 }
 
-function ImportUsersModal({ programas, onClose, onSuccess }: any) {
+function ImportUsersModal({ programas, territorios, onClose, onSuccess }: any) {
   const [file, setFile] = useState<File | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0, errors: [] as string[] })
@@ -383,9 +386,11 @@ function ImportUsersModal({ programas, onClose, onSuccess }: any) {
        const nombreCompleto = cols[0] || ""
        const documento = cols[1] || ""
        const email = cols[2] || ""
-       // 3 = Contraseña (ignorada, lo generamos nosotros)
-       const rolCol = cols[4] || ""
-       const programaCol = cols[5] || ""
+       const telefono = cols[3] || ""
+       // 4 = Contraseña (ignorada, lo generamos nosotros)
+       const rolCol = cols[5] || ""
+       const territorioCol = cols[6] || ""
+       const programaCol = cols[7] || ""
 
        let partesNombre = nombreCompleto.trim().split(/\s+/)
        
@@ -399,7 +404,27 @@ function ImportUsersModal({ programas, onClose, onSuccess }: any) {
        const firstLetter = nombre.charAt(0).toUpperCase()
        const password = firstLetter + documento
 
-       const rol = rolCol.toLowerCase().includes("admin") ? "admin" : "profesional"
+       const rColLower = rolCol.toLowerCase();
+       let rol = "profesional";
+       if (rColLower.includes("superadmin")) rol = "superadmin";
+       else if (rColLower.includes("admin") && !rColLower.includes("administrativo")) rol = "admin";
+       else if (rColLower.includes("administrativo")) rol = "administrativo";
+       else if (rColLower.includes("abogado")) rol = "abogado";
+       else if (rColLower.includes("facturador")) rol = "facturador";
+       else if (rColLower.includes("auxiliar")) rol = "auxiliar";
+
+        let territorioId = null
+        if ((rol === "profesional" || rol === "auxiliar") && territorioCol) {
+           const matchedT = territorios.find((t: any) => 
+             t.codigo.toLowerCase() === territorioCol.toLowerCase() ||
+             t.nombre.toLowerCase().includes(territorioCol.toLowerCase())
+           )
+           if (matchedT) {
+              territorioId = matchedT.id
+           } else {
+              errs.push(`Fila ${i+2}: No se encontró un territorio coincidente con '${territorioCol}'.`)
+           }
+        }
 
        let programaId = null
        if (rol === "profesional" && programaCol) {
@@ -418,7 +443,7 @@ function ImportUsersModal({ programas, onClose, onSuccess }: any) {
          const res = await fetch("/api/users", {
            method: "POST",
            headers: { "Content-Type": "application/json" },
-           body: JSON.stringify({ nombre, apellidos, documento, email, password, rol, programaId })
+           body: JSON.stringify({ nombre, apellidos, documento, email, telefono, password, rol, programaId, territorioId })
          })
          if (!res.ok) {
            const err = await res.json()
@@ -459,7 +484,7 @@ function ImportUsersModal({ programas, onClose, onSuccess }: any) {
             Suba un archivo CSV en formato (Valores Separados por Comas).<br/><br/>
             Orden de columnas (<strong>Obligatorio</strong>):<br/>
             <span className="font-semibold px-2 py-1 bg-muted rounded inline-block mt-2">
-              Nombre Completo | Documento | Email | Contraseña | Rol | Territorio | Programa
+              Nombre Completo | Documento | Email | Celular | Contraseña | Rol | Territorio | Programa
             </span>
             <br/><br/>
             <div className="text-xs text-muted-foreground p-3 bg-muted/30 rounded-lg space-y-2 border border-border/50">
@@ -515,6 +540,7 @@ function UserFormModal({ user, programas, territorios, onClose, onSave }: any) {
   const [apellidos, setApellidos] = useState(user?.apellidos || "")
   const [documento, setDocumento] = useState(user?.documento || "")
   const [email, setEmail] = useState(user?.email || "")
+  const [telefono, setTelefono] = useState(user?.telefono || "")
   const [password, setPassword] = useState("")
   // Si el usuario actual es admin normal, forzar a profesional
   const defaultRol = currentUser?.rol === "superadmin" ? "admin" : "auxiliar"
@@ -559,6 +585,7 @@ function UserFormModal({ user, programas, territorios, onClose, onSave }: any) {
       apellidos,
       documento,
       email,
+      telefono,
       password,
       rol,
       programaId: (rol === "profesional") ? programaId : null,
@@ -619,16 +646,30 @@ function UserFormModal({ user, programas, territorios, onClose, onSave }: any) {
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-semibold text-foreground">Email</label>
-            <input
-              required
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isAdminSelfEdit}
-              className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all disabled:opacity-50"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-foreground">Email</label>
+              <input
+                required
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isAdminSelfEdit}
+                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all disabled:opacity-50"
+              />
+            </div>
+            
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-foreground">Celular <span className="text-muted-foreground font-normal text-xs">*Obligatorio</span></label>
+              <input
+                required
+                type="tel"
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+                disabled={isAdminSelfEdit}
+                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all disabled:opacity-50"
+              />
+            </div>
           </div>
 
           {user ? (

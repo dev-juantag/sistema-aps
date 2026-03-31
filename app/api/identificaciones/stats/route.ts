@@ -30,6 +30,8 @@ export async function GET(request: Request) {
       where: whereFicha,
       select: {
         id: true,
+        estratoSocial: true,
+        vulnerabilidades: true,
         territorio: { select: { nombre: true, codigo: true } }
       }
     })
@@ -41,6 +43,7 @@ export async function GET(request: Request) {
         fichaId: { in: fichaIds }
       },
       select: {
+        fichaId: true,
         fechaNacimiento: true,
         sexo: true,
         gestante: true,
@@ -60,6 +63,7 @@ export async function GET(request: Request) {
         antecTransmisibles: true,
         enfermedadAguda: true,
         recibeAtencionMedica: true,
+        practicaDeportiva: true,
       }
     })
 
@@ -68,15 +72,19 @@ export async function GET(request: Request) {
     let menores5 = 0
     let mayores60 = 0
     let conDiscapacidad = 0
+    let victimas = 0
+    let signosDesnutricion = 0
+    let habitosSaludables = 0
+    let enfermedadHuerfanaHogares = new Set<string>()
 
-    // 2. Pirámide Poblacional
+    // 2. Pirámide Poblacional - Cursos de Vida
     const piramideMap: Record<string, { hombres: number, mujeres: number, label: string, sort: number }> = {
-      "0-4": { hombres: 0, mujeres: 0, label: "0-4", sort: 0 },
-      "5-14": { hombres: 0, mujeres: 0, label: "5-14", sort: 1 },
-      "15-24": { hombres: 0, mujeres: 0, label: "15-24", sort: 2 },
-      "25-44": { hombres: 0, mujeres: 0, label: "25-44", sort: 3 },
-      "45-64": { hombres: 0, mujeres: 0, label: "45-64", sort: 4 },
-      "65+": { hombres: 0, mujeres: 0, label: "65+", sort: 5 },
+      "Primera Infancia": { hombres: 0, mujeres: 0, label: "Primera Infancia (0-5)", sort: 0 },
+      "Infancia": { hombres: 0, mujeres: 0, label: "Infancia (6-11)", sort: 1 },
+      "Adolescencia": { hombres: 0, mujeres: 0, label: "Adolescencia (12-17)", sort: 2 },
+      "Juventud": { hombres: 0, mujeres: 0, label: "Juventud (18-28)", sort: 3 },
+      "Adultez": { hombres: 0, mujeres: 0, label: "Adultez (29-59)", sort: 4 },
+      "Vejez": { hombres: 0, mujeres: 0, label: "Vejez (60+)", sort: 5 },
     }
 
     // 3. Afiliación / Aseguramiento
@@ -104,10 +112,32 @@ export async function GET(request: Request) {
 
     const today = new Date()
 
+    const vulnerabilidadesMap: Record<string, number> = {}
+    const estratoMap: Record<string, number> = {}
+    const densidadMap: Record<string, number> = {}
+
+    fichas.forEach(f => {
+      // Estrato
+      const est = f.estratoSocial !== null ? String(f.estratoSocial) : "Sin registrar"
+      estratoMap[est] = (estratoMap[est] || 0) + 1
+
+      // Vulnerabilidades
+      if (Array.isArray(f.vulnerabilidades)) {
+        f.vulnerabilidades.forEach((v: string) => {
+          vulnerabilidadesMap[v] = (vulnerabilidadesMap[v] || 0) + 1
+        })
+      }
+      
+      const nom = f.territorio?.nombre || "Sin Asignar"
+      densidadMap[nom] = (densidadMap[nom] || 0) + 1
+    })
+
     pacientes.forEach(p => {
       // Demografía
       if (p.gestante === "SI") gestantes++
       if (p.grupoPoblacional?.includes(8)) conDiscapacidad++
+      if (p.grupoPoblacional?.includes(9)) victimas++
+      if (p.practicaDeportiva === true) habitosSaludables++
       
       if (p.fechaNacimiento) {
         const bd = new Date(p.fechaNacimiento)
@@ -119,12 +149,12 @@ export async function GET(request: Request) {
         if (age >= 60) mayores60++
 
         let rango = ""
-        if (age >= 0 && age <= 4) rango = "0-4"
-        else if (age >= 5 && age <= 14) rango = "5-14"
-        else if (age >= 15 && age <= 24) rango = "15-24"
-        else if (age >= 25 && age <= 44) rango = "25-44"
-        else if (age >= 45 && age <= 64) rango = "45-64"
-        else if (age >= 65) rango = "65+"
+        if (age >= 0 && age <= 5) rango = "Primera Infancia"
+        else if (age >= 6 && age <= 11) rango = "Infancia"
+        else if (age >= 12 && age <= 17) rango = "Adolescencia"
+        else if (age >= 18 && age <= 28) rango = "Juventud"
+        else if (age >= 29 && age <= 59) rango = "Adultez"
+        else if (age >= 60) rango = "Vejez"
 
         if (rango && p.sexo) {
           if (p.sexo === "HOMBRE") piramideMap[rango].hombres++
@@ -151,7 +181,10 @@ export async function GET(request: Request) {
       })
 
       // Nutrición
-      if (p.diagNutricional) nutricionMap[p.diagNutricional] = (nutricionMap[p.diagNutricional] || 0) + 1
+      if (p.diagNutricional) {
+        nutricionMap[p.diagNutricional] = (nutricionMap[p.diagNutricional] || 0) + 1
+        if ([4, 5, 6].includes(p.diagNutricional)) signosDesnutricion++
+      }
 
       // Morbilidad
       if (p.enfermedadAguda) enfermedadAgudaCount++
@@ -159,7 +192,10 @@ export async function GET(request: Request) {
 
       if (p.antecedentes && typeof p.antecedentes === 'object') {
         Object.entries(p.antecedentes).forEach(([k, v]) => {
-          if (v === true) cronicasMap[k] = (cronicasMap[k] || 0) + 1
+          if (v === true) {
+            cronicasMap[k] = (cronicasMap[k] || 0) + 1
+            if (k === 'huerfana' && p.fichaId) enfermedadHuerfanaHogares.add(p.fichaId)
+          }
         })
       }
       if (p.antecTransmisibles && typeof p.antecTransmisibles === 'object') {
@@ -169,12 +205,7 @@ export async function GET(request: Request) {
       }
     })
 
-    // Preparar Densidad Map
-    const densidadMap: Record<string, number> = {}
-    fichas.forEach(f => {
-      const nom = f.territorio?.nombre || "Sin Asignar"
-      densidadMap[nom] = (densidadMap[nom] || 0) + 1
-    })
+    // Preparar Densidad Map - Ya se hace en fichas.forEach
 
     return NextResponse.json({
       kpis: {
@@ -186,7 +217,11 @@ export async function GET(request: Request) {
         conDiscapacidad,
         cumpleEsquema,
         enfermedadAguda: enfermedadAgudaCount,
-        recibeAtencion: recibeAtencionCount
+        recibeAtencion: recibeAtencionCount,
+        victimas,
+        signosDesnutricion,
+        habitosSaludables,
+        hogaresHuerfanas: enfermedadHuerfanaHogares.size
       },
       piramide: Object.values(piramideMap).sort((a, b) => a.sort - b.sort),
       territorios: Object.entries(densidadMap).map(([name, count]) => ({ name, value: count })),
@@ -201,7 +236,9 @@ export async function GET(request: Request) {
       morbilidad: {
         cronicas: Object.entries(cronicasMap).map(([name, value]) => ({ name, value })),
         transmisibles: Object.entries(transmisiblesMap).map(([name, value]) => ({ name, value }))
-      }
+      },
+      vulnerabilidades: Object.entries(vulnerabilidadesMap).map(([name, value]) => ({ name, value })),
+      estratos: Object.entries(estratoMap).map(([name, value]) => ({ name, value }))
     })
 
   } catch (error: any) {
