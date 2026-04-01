@@ -1,193 +1,36 @@
 'use client'
 
 import { useFormContext } from 'react-hook-form'
-import { useEffect, useState } from 'react'
 import FamiliogramaViewer from '@/components/ui/FamiliogramaViewer'
-import { inp, sel, lbl, lblStyle, chk, chkLabel, required as reqStyle } from './wizardStyles'
-import { Code, Eye, RefreshCw, AlertTriangle } from 'lucide-react'
+import FamiliogramaCanvas from './FamiliogramaCanvas'
+import { inp, sel, lbl, lblStyle } from './wizardStyles'
+import { Code, Eye, RefreshCw, AlertTriangle, MousePointerSquareDashed } from 'lucide-react'
 
-// --- Mermaid Generator Logic ---
-function getMermaidCode(integrantes: any[]): string {
-  if (!integrantes || integrantes.length === 0) return ''
-
-  let code = "graph TD\n"
-  
-  // Nodos (Personas)
-  integrantes.forEach((int: any, idx: number) => {
-    const isMale = int.sexo === "HOMBRE"
-    let shapeStart = isMale ? "[" : "(("
-    let shapeEnd = isMale ? "]" : "))"
-    let styleClass = isMale ? "fill:#c2e0ff,stroke:#0f52ba" : "fill:#ffd1dc,stroke:#ff69b4"
-    
-    // Si sexo no es hombre ni mujer
-    if (!["HOMBRE", "MUJER"].includes(int.sexo)) {
-      shapeStart = "{"; shapeEnd = "}";
-      styleClass = "fill:#e6e6fa,stroke:#8a2be2";
-    }
-    
-    // Ajuste fallecidos
-    if (int.estadoVital === "FALLECIDO" || int.estadoVital === "ABORTO") {
-      styleClass += ",stroke-width:2px,stroke-dasharray: 5 5,color:#555";
-    } else {
-      styleClass += ",stroke-width:2px,color:#000";
-    }
-
-    const name = (int.primerNombre || `P${idx}`).replace(/[^a-zA-Z0-9]/g, "")
-    // Agregamos un identificador numérico visible
-    code += `  I${idx}${shapeStart}#${idx + 1} ${name}${shapeEnd}\n`
-    code += `  style I${idx} ${styleClass}\n`
-  })
-
-  code += "\n"
-
-  // Parejas
-  const procesados = new Set<string>()
-  integrantes.forEach((int: any, idx: number) => {
-    if (int.parejaId && int.parejaId !== "") {
-      const pId = parseInt(int.parejaId)
-      const pairKey = [idx, pId].sort().join('-')
-      if (!procesados.has(pairKey)) {
-        procesados.add(pairKey)
-        const tipoP = int.tipoPareja || 'UNION_LIBRE'
-        let connector = "---"
-        if (tipoP === "MATRIMONIO") connector = "==="
-        if (tipoP === "SEPARADO" || tipoP === "DIVORCIADO") connector = "-.-"
-        if (tipoP === "VIUDO") connector = "x--x"
-        
-        // El nodo puente de la pareja
-        const bridgeId = `U_${idx}_${pId}`
-        code += `  I${idx} ${connector} ${bridgeId}((💟)) ${connector} I${pId}\n`
-        code += `  style ${bridgeId} fill:#fff,stroke:none,font-size:10px\n`
-      }
-    }
-  })
-
-  code += "\n"
-
-  // Hijos
-  integrantes.forEach((int: any, idx: number) => {
-    const padre = int.padreId ? parseInt(int.padreId) : null
-    const madre = int.madreId ? parseInt(int.madreId) : null
-
-    // Si tiene ambos padres, buscar si son pareja para conectarlos desde la unión
-    if (padre !== null && madre !== null) {
-      const pairKey = [padre, madre].sort().join('-')
-      if (procesados.has(pairKey)) {
-        // Enlazar desde la unión
-        code += `  U_${Math.min(padre, madre)}_${Math.max(padre, madre)} --> I${idx}\n`
-      } else {
-        // Enlaces separados
-        code += `  I${padre} --> I${idx}\n`
-        code += `  I${madre} --> I${idx}\n`
-      }
-    } else if (padre !== null) {
-      code += `  I${padre} --> I${idx}\n`
-    } else if (madre !== null) {
-      code += `  I${madre} --> I${idx}\n`
-    }
-  })
-
-  return code
-}
-
-// Lógica para autoenlazar basado en rol (solo en el 1er render)
-function autoLinkRelatives(integrantes: any[]) {
-  const newList = JSON.parse(JSON.stringify(integrantes));
-  let changed = false;
-
-  const jefeIdx = newList.findIndex((i: any) => String(i.parentesco) === '1');
-  const conyugeIdx = newList.findIndex((i: any) => String(i.parentesco) === '2');
-
-  // Enlazar Jefe y Conyuge
-  if (jefeIdx >= 0 && conyugeIdx >= 0) {
-    if (!newList[jefeIdx].parejaId && !newList[conyugeIdx].parejaId) {
-      newList[jefeIdx].parejaId = String(conyugeIdx);
-      newList[conyugeIdx].parejaId = String(jefeIdx);
-      changed = true;
-    }
-  }
-
-  // Enlazar hijos (parentesco=3) al Jefe y al Conyuge por defecto (si aplicara)
-  newList.forEach((int: any, idx: number) => {
-    if (String(int.parentesco) === '3') {
-      if (jefeIdx >= 0 && !int.padreId && !int.madreId) {
-        // Buscar el hombre y la mujer entre jefe y conyuge (si aplica)
-        const isJefeHombre = newList[jefeIdx].sexo === 'HOMBRE';
-        if (isJefeHombre) {
-          int.padreId = String(jefeIdx);
-          if (conyugeIdx >= 0) int.madreId = String(conyugeIdx);
-        } else {
-          int.madreId = String(jefeIdx);
-          if (conyugeIdx >= 0) int.padreId = String(conyugeIdx);
-        }
-        changed = true;
-      }
-    }
-  });
-
-  return { newList, changed };
-}
-
+// Capa de Negocio Externa
+import { useFamiliogramaManager } from '@/lib/familiograma/hooks'
+import { FAMILY_TYPE_NAMES } from '@/lib/familiograma/constants'
+import { Integrante } from '@/lib/familiograma/types'
 
 export default function Step6Familiograma() {
-  const { register, watch, setValue, getValues } = useFormContext()
-  const integrantes = watch('integrantes') || []
-  const currentCode = watch('familiogramaCodigo') || ''
-  const declaredType = watch('tipoFamilia')
+  const { register } = useFormContext()
+  const {
+    integrantes,
+    internalCode,
+    declaredType,
+    mode,
+    setMode,
+    handleUpdateCode,
+    validation,
+    setValue
+  } = useFamiliogramaManager()
 
-  const [mode, setMode] = useState<'visualizar' | 'codigo'>('visualizar')
-  const [internalCode, setInternalCode] = useState(currentCode)
+  const { inferredType, reason, mismatch } = validation
 
-  useEffect(() => {
-    // 1. Autoenlace inicial (solo si NO hay código existente para no pisar ediciones)
-    if (!currentCode && integrantes.length > 0) {
-      const { newList, changed } = autoLinkRelatives(integrantes);
-      if (changed) {
-        setValue('integrantes', newList);
-        const code = getMermaidCode(newList);
-        setValue('familiogramaCodigo', code);
-        setInternalCode(code);
-        return;
-      }
-    }
-    
-    // 2. Si el usuaro no está editando el código escrito, actualizar desde Selectors
-    if (mode === 'visualizar') {
-      const genCode = getMermaidCode(integrantes);
-      if (genCode !== currentCode) {
-        setValue('familiogramaCodigo', genCode);
-        setInternalCode(genCode);
-      }
-    }
-  }, [integrantes, mode]) // Re-run al cambiar integrantes
-
-  const handleUpdateCode = (val: string) => {
-    setInternalCode(val)
-    setValue('familiogramaCodigo', val)
+  const handleIntegrantesUpdate = (updater: (prev: Integrante[]) => Integrante[]) => {
+    // Para simplificar la mutación desde ReactFlow
+    const newInt = updater(integrantes)
+    setValue('integrantes', newInt, { shouldDirty: true })
   }
-
-  // Inferencia para la Validación Inteligente
-  const numInt = integrantes.length;
-  const numParejas = integrantes.filter((i: any) => i.parejaId && i.parejaId !== '').length;
-  const numHijos = integrantes.filter((i: any) => String(i.parentesco) === '3' || i.padreId || i.madreId).length;
-  const numPadresSuegrosNietos = integrantes.filter((i: any) => ['4','5','6','7','8'].includes(String(i.parentesco))).length;
-
-  let inferredType = '7'; // Otro
-  let reason = '';
-  if (numInt === 1) {
-    inferredType = '5'; reason = 'Hay un solo integrante registrado.';
-  } else if (numPadresSuegrosNietos > 0) {
-    inferredType = '3'; reason = 'Hay miembros de generaciones altas (abuelos, suegros, tíos).';
-  } else if (numParejas >= 2 && numHijos > 0) {
-    inferredType = '1'; reason = 'Existen vínculos formales de pareja y registro paterno de hijos.';
-  } else if (numParejas >= 2 && numHijos === 0) {
-    inferredType = '1'; reason = 'Pareja sin hijos convivientes directos.';
-  } else if (numParejas === 0 && numHijos > 0) {
-    inferredType = '2'; reason = 'Hay hijos pero no se registran parejas dentro del hogar actual.';
-  }
-  
-  const typeNames: Record<string, string> = { '1': 'Nuclear', '2': 'Monoparental', '3': 'Extensa', '4': 'Compuesta', '5': 'Unipersonal', '6': 'Homoparental' };
-  const mismatch = declaredType && inferredType !== declaredType && declaredType !== '7' && inferredType !== '7';
 
   return (
     <div className="space-y-6">
@@ -200,7 +43,7 @@ export default function Step6Familiograma() {
         <div>
           <h3 className="font-bold text-[#081e69] text-base">Consolidación del Familiograma</h3>
           <p className="text-sm text-gray-600 mt-1 leading-snug">
-            El sistema ha generado un diagrama base calculando las relaciones familiares (Ej. uniendo al Jefe y al Cónyuge con los Hijos). Usa los <b>Selectores de Ajuste</b> a continuación para corregir las conexiones incorrectas. El gráfico se actualizará en tiempo real.
+            El sistema ha generado un diagrama base calculando las relaciones familiares. Usa los <b>Selectores de Ajuste</b> a continuación, o prueba la nueva herramienta <b>Canvas Interactivo</b> para dibujar arreglos de vínculos manualmente arrastrando líneas.
           </p>
         </div>
       </div>
@@ -212,69 +55,84 @@ export default function Step6Familiograma() {
           <div>
             <h4 className="font-bold text-sm uppercase tracking-wide">Validación Inteligente de Estructura</h4>
             <p className="text-sm mt-1">
-              Declaraste la familia como <b>{typeNames[declaredType as string] || 'Otra'}</b>, 
-              pero tu diagrama parece <b>{typeNames[inferredType] || 'Otra'}</b>.
+              Declaraste la familia como <b>{FAMILY_TYPE_NAMES[declaredType] || 'Otra'}</b>, 
+              pero tu diagrama parece <b>{FAMILY_TYPE_NAMES[inferredType] || 'Otra'}</b>.
             </p>
             <p className="text-xs mt-1 text-amber-700 opacity-80">Razón de la IA: {reason}</p>
           </div>
         </div>
       )}
 
-      {/* SPLIT VIEW (Or Stacked on Mobile) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-white p-4 rounded-2xl border border-gray-200">
+      {/* SPLIT VIEW */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 bg-white p-4 rounded-2xl border border-gray-200">
         
-        {/* LADO IZQUIERDO: VISOR O EDITOR */}
-        <div className="flex flex-col gap-3 min-h-[400px]">
+        {/* LADO IZQUIERDO: VISOR / EDITOR / CANVAS */}
+        <div className="flex flex-col gap-3 min-h-[500px]">
           <div className="flex items-center justify-between border-b pb-2">
             <h4 className="font-bold text-gray-700">Previsualización</h4>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 flex-wrap justify-end">
               <button 
                 type="button" 
                 onClick={() => setMode('visualizar')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'visualizar' ? 'bg-[#081e69] text-white shadow' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'visualizar' ? 'bg-[#081e69] text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               >
-                Gráfico Visual
+                Mermaid Visual
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setMode('interactivo')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'interactivo' ? 'bg-indigo-600 text-white shadow' : 'bg-gray-100 text-indigo-700 hover:bg-indigo-100'} flex items-center gap-1.5`}
+              >
+                <MousePointerSquareDashed className="w-3.5 h-3.5" /> Canvas Interactivo
               </button>
               <button 
                 type="button" 
                 onClick={() => setMode('codigo')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === 'codigo' ? 'bg-[#081e69] text-white shadow' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'} flex items-center gap-1.5`}
+                title="Para usuarios avanzados que dominan Mermaid JS"
               >
-                <Code className="w-3.5 h-3.5" /> Mermaid (Pro)
+                <Code className="w-3.5 h-3.5" /> Código (Pro)
               </button>
             </div>
           </div>
           
-          <div className="flex-1 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 flex flex-col justify-center">
-            {mode === 'visualizar' ? (
+          <div className="flex-1 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 flex flex-col justify-center relative">
+            {mode === 'visualizar' && (
                <FamiliogramaViewer code={internalCode} />
-            ) : (
+            )}
+            
+            {mode === 'interactivo' && (
+               <FamiliogramaCanvas 
+                  integrantes={integrantes} 
+                  onUpdateIntegrantes={handleIntegrantesUpdate}
+               />
+            )}
+
+            {mode === 'codigo' && (
               <textarea 
                 value={internalCode}
                 onChange={(e) => handleUpdateCode(e.target.value)}
-                className="w-full h-full min-h-[400px] p-4 font-sans text-sm resize-none focus:outline-none focus:ring-2 ring-inset ring-[#081e69]/20"
+                className="w-full h-full min-h-[400px] p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 ring-inset ring-[#081e69]/20 bg-slate-900 text-slate-50"
                 placeholder="Escribe código Mermaid aquí..."
               />
             )}
           </div>
-          {mode === 'codigo' && (
-            <p className="text-[10px] text-gray-400">Las modificaciones al código manual no actualizarán retroactivamente los dropdowns a la derecha, pero sí se guardarán en la ficha.</p>
-          )}
         </div>
 
         {/* LADO DERECHO: SELECTORES */}
-        <div className="flex flex-col gap-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-          <div className="border-b pb-2 flex items-center gap-2">
-             <RefreshCw className="w-4 h-4 text-gray-400" />
-             <h4 className="font-bold text-gray-700">Ajustar Vínculos (Filtro Humano)</h4>
+        <div className="flex flex-col gap-3 max-h-[600px] xl:max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
+          <div className="border-b pb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-gray-400" />
+              <h4 className="font-bold text-gray-700">Ajustar Vínculos (Filtro Humano)</h4>
+            </div>
           </div>
 
           {!integrantes || integrantes.length === 0 ? (
             <p className="text-xs text-gray-400 italic">Agrega integrantes en el Paso 4 para ver las conexiones.</p>
           ) : (
             <>
-              {integrantes.map((int: any, i: number) => {
-                // Cálculo de edad
+              {integrantes.map((int: Integrante, i: number) => {
                 const nac = int.fechaNacimiento;
                 let edad = 0;
                 if (nac) {
@@ -290,7 +148,7 @@ export default function Step6Familiograma() {
                   <div key={i} className="bg-gray-50 rounded-xl p-3 border border-gray-200 space-y-2">
                     <p className="font-bold text-[11px] uppercase tracking-wide text-[#081e69] flex items-center gap-1.5">
                       <span className="w-5 h-5 rounded-md bg-[#081e69] text-white flex items-center justify-center font-black">#{i+1}</span>
-                      {int.primerNombre || `Integrante ${i+1}`} {int.primerApellido}
+                      {int.primerNombre || int.nombres || `Integrante ${i+1}`} {int.primerApellido || int.apellidos}
                     </p>
 
                     <div className="grid grid-cols-2 gap-2 mt-2">
@@ -313,7 +171,6 @@ export default function Step6Familiograma() {
                         </select>
                       </div>
 
-                      {/* Mostrar edición de Pareja solo mayores a 12 */}
                       {edad >= 12 && (
                         <div className="col-span-2 space-y-1 mt-1 p-2 bg-indigo-50 rounded-lg">
                           <label className={lbl} style={lblStyle}>Pareja (En el hogar)</label>

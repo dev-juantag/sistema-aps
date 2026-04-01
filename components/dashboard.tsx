@@ -71,7 +71,7 @@ export function Dashboard() {
   }
 
   if (isAdmin || user?.rol === "superadmin") {
-    navItems.push({ id: "consolidado-territorios", label: "Consolidado Territorios", icon: <MapPinned className="h-5 w-5" /> })
+    navItems.push({ id: "consolidado-territorios", label: "integrantes", icon: <MapPinned className="h-5 w-5" /> })
   }
 
   const adminNavItems: NavItem[] = [

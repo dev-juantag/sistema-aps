@@ -410,7 +410,13 @@ export function AtencionesModule() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {errAt || errSt || errPr ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-destructive">
+                    Error al cargar: {errAt?.message || errSt?.message || errPr?.message || "Error desconocido"}
+                  </td>
+                </tr>
+              ) : loading ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
                     Cargando atenciones...

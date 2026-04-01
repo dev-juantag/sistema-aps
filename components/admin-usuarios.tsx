@@ -722,20 +722,20 @@ function UserFormModal({ user, programas, territorios, onClose, onSave }: any) {
             <select
               value={rol}
               onChange={(e) => setRol(e.target.value as Role)}
-              disabled={currentUser?.rol === "admin" && rol !== "superadmin"}
+              disabled={!!user && (user.rol === "superadmin" || (currentUser?.rol === "admin" && user.rol === "admin" && currentUser?.id !== user.id))}
               className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all disabled:opacity-50"
             >
               <option value="auxiliar">Auxiliar de Enfermería</option>
               <option value="profesional">Profesional</option>
-              {(currentUser?.rol === "superadmin" || rol === "admin") && (
-                <>
-                  <option value="admin">Administrador</option>
-                  <option value="administrativo">Administrativo</option>
-                  <option value="abogado">Abogado</option>
-                  <option value="facturador">Facturador</option>
-                </>
+              <option value="administrativo">Administrativo</option>
+              <option value="abogado">Abogado</option>
+              <option value="facturador">Facturador</option>
+              
+              {(currentUser?.rol === "superadmin" || (user && user.rol === "admin")) && (
+                <option value="admin">Administrador</option>
               )}
-              {/* Si se está editando a un superadmin, no permitir cambiarlo, pero mostrar su opción si ya lo es */}
+              
+              {/* Si se está editando a un superadmin, mostrar su opción si ya lo es */}
               {rol === "superadmin" && (
                 <option value="superadmin">Súper Admin</option>
               )}

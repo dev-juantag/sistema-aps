@@ -56,7 +56,7 @@ export function AdminConsolidadoTerritorios() {
     return (
       <div className="flex h-[50vh] flex-col items-center justify-center gap-4 text-muted-foreground animate-in fade-in duration-500">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-r-transparent"></div>
-        <p className="font-medium">Cargando consolidado de territorios...</p>
+        <p className="font-medium">Cargando integrantes...</p>
       </div>
     )
   }
@@ -71,7 +71,7 @@ export function AdminConsolidadoTerritorios() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight mb-2 flex items-center gap-3">
              <MapPinned className="h-8 w-8 text-primary" />
-             Consolidado de Territorios
+             Integrantes de los territorios
           </h1>
           <p className="text-muted-foreground">
             Vista administrativa del equipo de trabajo asignado a cada uno de los territorios.

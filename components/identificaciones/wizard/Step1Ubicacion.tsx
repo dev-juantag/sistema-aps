@@ -2,7 +2,8 @@
 
 import { useFormContext } from 'react-hook-form'
 import { MapPin, Info } from 'lucide-react'
-import { Label, Input } from '@/components/ui-basic'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { ESTADO_VISITA } from '@/lib/constants'
 
 export default function Step1Ubicacion({ coords, capture, loading }: any) {
