@@ -259,6 +259,13 @@ export async function POST(req: Request) {
           // ── Datos Familiares ──────────────────────────────────────────────
           tipoFamilia: safeInt(get(h, 'tipoFamilia', 'tipofamilia')),
           apgar: safeInt(get(h, 'codResultadoAPGAR', 'codresultadoapgar', 'apgar')),
+          apgarRespuestas: [
+            safeInt(get(h, 'apgar_P1', 'apgar_p1')) ?? 0,
+            safeInt(get(h, 'apgar_P2', 'apgar_p2')) ?? 0,
+            safeInt(get(h, 'apgar_P3', 'apgar_p3')) ?? 0,
+            safeInt(get(h, 'apgar_P4', 'apgar_p4')) ?? 0,
+            safeInt(get(h, 'apgar_P5', 'apgar_p5')) ?? 0,
+          ].filter(x => x !== null),
           ecomapa: safeInt(get(h, 'ecomapa', 'ecomapa')),
           cuidadorPrincipal: getBoolean(get(h, 'cuidador', 'cuidadorprincipal')),
           zarit: safeInt(get(h, 'escalaZARIT', 'escalazarit', 'zarit')),

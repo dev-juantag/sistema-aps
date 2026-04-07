@@ -13,7 +13,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = verifyToken(req);
+    const auth = await verifyToken(req);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -65,11 +65,17 @@ export async function PUT(
       }
 
       const validRolesWithPrograma = ["PROFESIONAL"]
-      const validRolesWithTerritorio = ["AUXILIAR", "PROFESIONAL"]
+      const validRolesWithTerritorio = ["AUXILIAR", "PROFESIONAL", "FACTURADOR"]
       
       dataToUpdate.rol = upperRol as any
       dataToUpdate.programaId = validRolesWithPrograma.includes(upperRol) ? programaId || null : null
       dataToUpdate.territorioId = validRolesWithTerritorio.includes(upperRol) ? body.territorioId || null : null
+
+      if (upperRol === "FACTURADOR" && Array.isArray(body.territorioIds)) {
+        dataToUpdate.territoriosAsignados = {
+          set: body.territorioIds.map((id: string) => ({ id }))
+        }
+      }
     } else {
       if (programaId !== undefined) {
         dataToUpdate.programaId = programaId || null
@@ -111,7 +117,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = verifyToken(req);
+    const auth = await verifyToken(req);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

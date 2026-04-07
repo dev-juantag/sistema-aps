@@ -144,7 +144,7 @@ export function MiTerritorioModule() {
           </div>
           
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full min-w-[700px] text-sm text-left">
               <thead>
                 <tr className="border-b bg-muted/40 text-muted-foreground font-medium">
                   <th className="px-5 py-3 rounded-tl-lg">Nombre del Colaborador</th>

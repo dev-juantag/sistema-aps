@@ -1,13 +1,14 @@
 import jwt from "jsonwebtoken";
+import { prisma } from "@/lib/prisma";
 
 export interface DecodedToken {
   userId: string;
-  rol: "SUPERADMIN" | "ADMIN" | "PROFESIONAL" | "AUXILIAR";
+  rol: "SUPERADMIN" | "ADMIN" | "PROFESIONAL" | "AUXILIAR" | "FACTURADOR" | "ADMINISTRATIVO" | "ABOGADO";
   iat: number;
   exp: number;
 }
 
-export function verifyToken(req: Request): { error?: string; decoded?: DecodedToken, status?: number } {
+export async function verifyToken(req: Request): Promise<{ error?: string; decoded?: DecodedToken, status?: number }> {
   const authHeader = req.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -24,6 +25,27 @@ export function verifyToken(req: Request): { error?: string; decoded?: DecodedTo
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
+    
+    // Verificamos si hay un login más reciente usando lastLogin
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { lastLogin: true, activo: true }
+    });
+
+    if (!user || user.activo === false) {
+      return { error: 'Usuario no existe o está desactivado.', status: 401 };
+    }
+
+    if (user.lastLogin && decoded.iat) {
+      const iatTime = decoded.iat;
+      // Validamos dándole 5 segundos de margen
+      const lastLoginTime = Math.floor(user.lastLogin.getTime() / 1000) - 5;
+      
+      if (iatTime < lastLoginTime) {
+        return { error: 'Sesión terminada: Alguien inició sesión en otra ubicación.', status: 401 };
+      }
+    }
+
     return { decoded };
   } catch (error: any) {
     if (error.name === 'TokenExpiredError') {

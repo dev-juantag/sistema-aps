@@ -1,0 +1,133 @@
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "postgres", schema "public" at "aws-1-us-east-2.pooler.supabase.com:5432"
+
+Drift detected: Your database schema is not in sync with your migration history.
+
+The following is a summary of the differences between the expected database schema given your migrations files, and the actual schema of the database.
+
+It should be understood as the set of changes to get from the expected schema to the actual schema.
+
+[+] Added enums
+  - ContratoEstado
+  - DerivacionEstado
+  - EstadoFacturacion
+
+[+] Added tables
+  - Contrato
+  - Derivacion
+  - EstadoContratoHistorial
+  - FichaHogar
+  - SystemSettings
+  - Territorio
+
+[*] Changed the `Rol` enum
+  [+] Added variant `SUPERADMIN`
+  [+] Added variant `ADMINISTRATIVO`
+  [+] Added variant `ABOGADO`
+  [+] Added variant `AUXILIAR`
+  [+] Added variant `FACTURADOR`
+
+[*] Changed the `Atencion` table
+  [+] Added column `estadoFacturacion`
+  [+] Added column `territorioId`
+  [+] Added column `updatedAt`
+  [+] Added foreign key on columns (territorioId)
+
+[*] Changed the `Contrato` table
+  [+] Added unique index on columns (cdp)
+  [+] Added unique index on columns (numeroContrato)
+  [+] Added unique index on columns (numeroPoliza)
+  [+] Added unique index on columns (rp)
+  [+] Added foreign key on columns (territorioId)
+  [+] Added foreign key on columns (userId)
+
+[*] Changed the `Derivacion` table
+  [+] Added unique index on columns (atencionId)
+  [+] Added foreign key on columns (atencionId)
+  [+] Added foreign key on columns (fichaId)
+  [+] Added foreign key on columns (pacienteId)
+  [+] Added foreign key on columns (profesionalId)
+  [+] Added foreign key on columns (programaId)
+  [+] Added foreign key on columns (territorioId)
+
+[*] Changed the `EstadoContratoHistorial` table
+  [+] Added foreign key on columns (contratoId)
+  [+] Added foreign key on columns (modificadoPorId)
+
+[*] Changed the `FichaHogar` table
+  [+] Added unique index on columns (consecutivo)
+  [+] Added foreign key on columns (encuestadorId)
+  [+] Added foreign key on columns (territorioId)
+
+[*] Changed the `Paciente` table
+  [-] Removed column `genero`
+  [-] Removed column `nombreCompleto`
+  [-] Removed column `tipoDocumento`
+  [+] Added column `antecTransmisibles`
+  [+] Added column `antecedentes`
+  [+] Added column `apellidos`
+  [+] Added column `barrerasAcceso`
+  [+] Added column `createdAt`
+  [+] Added column `diagNutricional`
+  [+] Added column `discapacidades`
+  [+] Added column `eapb`
+  [+] Added column `enfermedadAguda`
+  [+] Added column `esquemaAtenciones`
+  [+] Added column `esquemaVacunacion`
+  [+] Added column `estadoVital`
+  [+] Added column `etnia`
+  [+] Added column `fichaId`
+  [+] Added column `generoIdentidad`
+  [+] Added column `gestante`
+  [+] Added column `grupoPoblacional`
+  [+] Added column `intervencionesPendientes`
+  [+] Added column `lactanciaMaterna`
+  [+] Added column `lactanciaMeses`
+  [+] Added column `madreId`
+  [+] Added column `mesesGestacion`
+  [+] Added column `nivelEducativo`
+  [+] Added column `nombres`
+  [+] Added column `ocupacion`
+  [+] Added column `padreId`
+  [+] Added column `parejaId`
+  [+] Added column `parentesco`
+  [+] Added column `perimetroBraquial`
+  [+] Added column `peso`
+  [+] Added column `practicaDeportiva`
+  [+] Added column `puebloIndigena`
+  [+] Added column `recibeAtencionMedica`
+  [+] Added column `regimen`
+  [+] Added column `remisiones`
+  [+] Added column `sexo`
+  [+] Added column `talla`
+  [+] Added column `tipoDoc`
+  [+] Added column `tipoHijo`
+  [+] Added column `tipoPareja`
+  [+] Added column `updatedAt`
+  [*] Altered column `telefono` (changed from Required to Nullable)
+  [*] Altered column `direccion` (changed from Required to Nullable)
+  [*] Altered column `fechaNacimiento` (type changed)
+  [+] Added foreign key on columns (fichaId)
+
+[*] Changed the `Programa` table
+  [+] Added column `meta`
+
+[*] Changed the `Territorio` table
+  [+] Added unique index on columns (codigo)
+
+[*] Changed the `User` table
+  [+] Added column `activo`
+  [+] Added column `lastLogin`
+  [+] Added column `recoveryCode`
+  [+] Added column `recoveryExpires`
+  [+] Added column `telefono`
+  [+] Added column `territorioId`
+  [+] Added column `updatedAt`
+  [*] Altered column `rol` (default changed from `None` to `Some(Value(Enum("AUXILIAR")))`)
+  [+] Added foreign key on columns (territorioId)
+
+We need to reset the "public" schema at "aws-1-us-east-2.pooler.supabase.com:5432"
+
+You may use prisma migrate reset to drop the development database.
+All data will be lost.

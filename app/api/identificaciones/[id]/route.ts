@@ -44,15 +44,15 @@ export async function GET(
 
     // Generar familiograma si no existe o para asegurar frescura en visualización
     if (!ficha.familiogramaCodigo && ficha.pacientes && ficha.pacientes.length > 0) {
-       const { generateFamiliogramaMermaid } = await import("@/lib/familiograma");
-       ficha.familiogramaCodigo = generateFamiliogramaMermaid(ficha.pacientes);
+       const { generateFamiliogramaAutoLayout } = await import("@/lib/familiograma");
+       ficha.familiogramaCodigo = generateFamiliogramaAutoLayout(ficha.pacientes);
     }
 
     return NextResponse.json(ficha);
 
   } catch (error: any) {
     console.error("GET FICHA ERROR:", error);
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+    return NextResponse.json({ error: "Error interno del servidor", detail: error?.message, stack: error?.stack }, { status: 500 });
   }
 }
 
@@ -163,6 +163,7 @@ export async function PUT(
       tipoFamilia: isEfectiva ? (hogarData.tipoFamilia ? parseInt(hogarData.tipoFamilia) : null) : null,
       numIntegrantes: isEfectiva ? (hogarData.numIntegrantes ? parseInt(hogarData.numIntegrantes) : null) : 0,
       apgar: isEfectiva ? (hogarData.apgar ? parseInt(hogarData.apgar) : null) : null,
+      apgarRespuestas: isEfectiva && Array.isArray(hogarData.apgarRespuestas) ? hogarData.apgarRespuestas : [],
       ecomapa: isEfectiva ? (hogarData.ecomapa ? parseInt(hogarData.ecomapa) : null) : null,
       cuidadorPrincipal: isEfectiva ? (hogarData.cuidadorPrincipal === true || hogarData.cuidadorPrincipal === 'true') : false,
       zarit: isEfectiva ? (hogarData.zarit ? parseInt(hogarData.zarit) : null) : null,
@@ -179,8 +180,8 @@ export async function PUT(
 
     if (territorio) fichaData.territorio = { connect: { id: String(territorio) } };
 
-    const { generateFamiliogramaMermaid } = await import("@/lib/familiograma");
-    fichaData.familiogramaCodigo = isEfectiva && hogarData.familiogramaCodigo ? hogarData.familiogramaCodigo : (finalIntegrantes.length > 0 ? generateFamiliogramaMermaid(finalIntegrantes) : null)
+    const { generateFamiliogramaAutoLayout } = await import("@/lib/familiograma");
+    fichaData.familiogramaCodigo = isEfectiva && hogarData.familiogramaCodigo ? hogarData.familiogramaCodigo : (finalIntegrantes.length > 0 ? generateFamiliogramaAutoLayout(finalIntegrantes) : null)
 
 
     const result = await prisma.$transaction(async (tx: any) => {

@@ -1,39 +1,19 @@
 import { PARENTESCO } from "@/lib/constants";
 
-export function generateFamiliogramaMermaid(integrantes: any[]): string {
+export function generateFamiliogramaAutoLayout(integrantes: any[]): string {
   if (!integrantes || integrantes.length === 0) return '';
-  let m = 'graph TD;\n';
   
-  // Custom styles para familiograma PRO
-  m += 'classDef hombre fill:#bfdbfe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a,font-weight:bold,rx:4,ry:4;\n';
-  m += 'classDef mujer fill:#fbcfe8,stroke:#db2777,stroke-width:2px,color:#831843,font-weight:bold,rx:30,ry:30;\n';
-  m += 'classDef index fill:#fef08a,stroke:#ca8a04,stroke-width:3px,color:#854d0e,font-weight:bold;\n';
-  m += 'classDef fallecido stroke-dasharray: 5 5,color:#6b7280;\n';
-  // Nodo de union minúsculo que parece un punto en la línea
-  m += 'classDef union fill:#1e293b,stroke:#1e293b,stroke-width:1px,color:transparent;\n';
+  const nodes: any[] = [];
+  const edges: any[] = [];
   
-  // Helper
-  const getLabel = (id: any) => PARENTESCO.find((p: any) => String(p.id) === String(id))?.label || ('Rol '+id);
+  // Custom helpers
+  const getLabel = (id: any) => PARENTESCO.find((p: any) => String(p.id) === String(id))?.label || ('Rol ' + id);
 
-  // 1. Preparar Nodos y fallback de relaciones
+  // Auto-completar relaciones explícitas faltantes (para no perder vinculaciones en importaciones viejas)
   const jefe = integrantes.find(i => String(i.parentesco) === '1') || integrantes[0];
   const conyugesJefe = integrantes.filter(i => String(i.parentesco) === '2');
 
   integrantes.forEach((int, idx) => {
-    int._id = `P${idx}`;
-    int._age = '';
-    
-    // Mapeo para campos que vienen de la BD (nombres -> primerNombre, etc)
-    const pNombre = int.primerNombre || int.nombres || '';
-    const pApellido = int.primerApellido || int.apellidos || '';
-    int._fullName = `${pNombre} ${pApellido}`.trim();
-
-    if (int.fechaNacimiento) {
-      const bDate = new Date(int.fechaNacimiento);
-      int._age = new Date().getFullYear() - bDate.getFullYear();
-    }
-    
-    // Auto-completar relaciones explícitas si no las tienen (soporte a registros antiguos o inyectados)
     if (!int.padreId && !int.madreId && !int.parejaId) {
       const p = String(int.parentesco);
       if (p === '2') int.parejaId = String(integrantes.indexOf(jefe)); // Conyuge -> Jefe
@@ -53,117 +33,118 @@ export function generateFamiliogramaMermaid(integrantes: any[]): string {
     }
   });
 
-  // 2. Dibujar Nodos (Personas)
+  // Calculate coordinates by grouping generations
+  const generations: Record<string, any[]> = {
+    parents: [],
+    ego: [],
+    children: [],
+    others: []
+  };
+
   integrantes.forEach(int => {
-    let name = int._fullName;
-    if (!name) name = "Desconocido";
-    let extra = '';
-    
-    if (int._age !== '') extra += `<br/>(${int._age} años)`;
-    if (int.gestante === 'SI') extra += `<br/>🤰 Gestante`;
-    if (int.enfermedadAguda === true || int.enfermedadAguda === 'true') extra += `<br/>🩺 Enf. Aguda`;
-    
-    if (int.estadoVital === 'FALLECIDO') extra = `<br/>✟ FALLECIDO` + extra;
-    if (int.estadoVital === 'ABORTO') extra = `<br/>🔻 ABORTO` + extra;
-    
-    if (int === jefe) extra += `<br/><b>⭐ EGO</b>`;
-    else extra += `<br/><i>${getLabel(int.parentesco)}</i>`;
-
-    m += `${int._id}["${name}${extra}"];\n`;
-
-    const s = String(int.sexo).toUpperCase();
-    let cls = s === 'MUJER' ? 'mujer' : 'hombre';
-
-    m += `class ${int._id} ${cls};\n`;
-    
-    if (int.estadoVital === 'FALLECIDO') m += `class ${int._id} fallecido;\n`;
-    if (int === jefe) m += `style ${int._id} stroke:#ca8a04,stroke-width:4px;\n`; 
+    const p = String(int.parentesco);
+    if (p === '4' || p === '5') generations.parents.push(int);
+    else if (p === '1' || p === '2' || p === '7') generations.ego.push(int);
+    else if (p === '3' || p === '6') generations.children.push(int);
+    else generations.others.push(int);
   });
 
-  // 3. Dibujar Relaciones (Aristas)
-  const unionesDibujadas = new Set<string>();
-  let unionCounter = 0;
+  let xPos = 0;
+  
+  const placeGeneration = (group: any[], startY: number) => {
+     let currentX = 0;
+     group.forEach((int) => {
+        int._x = currentX;
+        int._y = startY;
+        int._nodeId = `node-${int.id || Math.random().toString(36).substring(7)}`;
+        currentX += 160; // Horizontal spacing between nodes
+     });
+     // Center the generation roughly
+     const offsetStr = currentX / 2;
+     group.forEach(int => int._x -= offsetStr);
+  };
 
+  placeGeneration(generations.parents, 100);
+  placeGeneration(generations.ego, 300);
+  placeGeneration(generations.children, 500);
+  placeGeneration(generations.others, 700);
+
+  // Generar Nodos React Flow
+  integrantes.forEach(int => {
+    const bDate = int.fechaNacimiento ? new Date(int.fechaNacimiento) : null;
+    const age = bDate ? (new Date().getFullYear() - bDate.getFullYear()).toString() : '?';
+
+    let estadoV = 'VIVO';
+    if (int.estadoVital === 'FALLECIDO' || int.estadoVital === 'ABORTO') {
+       estadoV = int.estadoVital === 'ABORTO' ? 'ABORTO_ESP' : 'FALLECIDO'; // Aproximación
+    }
+
+    nodes.push({
+      id: int._nodeId,
+      type: 'integrante',
+      position: { x: int._x + 400, y: int._y }, // Offset total
+      data: {
+        nombre: (int.primerNombre || int.nombres || '') + ' ' + (int.primerApellido || int.apellidos || ''),
+        edad: age,
+        sexo: int.sexo || 'INDEFINIDO',
+        fallecido: int.estadoVital === 'FALLECIDO',
+        gestante: int.gestante || 'NA',
+        enfermedadAguda: int.enfermedadAguda === true || int.enfermedadAguda === 'true',
+        estadoVital: estadoV,
+        parentescoLabel: int === jefe ? '⭐ Jefe de hogar' : getLabel(int.parentesco)
+      }
+    });
+  });
+
+  // Generar Aristas React Flow
+  let edgeCounter = 0;
   integrantes.forEach((int, idx) => {
-    // --- RELACIONES DE PAREJA ---
+    // Relación de pareja
     if (int.parejaId && int.parejaId !== '') {
       const pIdx = parseInt(int.parejaId);
       if (!isNaN(pIdx) && integrantes[pIdx]) {
-        const uId = [idx, pIdx].sort().join('_');
-        if (!unionesDibujadas.has(uId)) {
-          unionesDibujadas.add(uId);
-          unionCounter++;
-          const nodeUnion = `U${unionCounter}`;
-          
-          let estado = int.tipoPareja || 'UNION_LIBRE';
-          m += `${nodeUnion}(" ");\n`;
-          m += `style ${nodeUnion} width:2px,height:2px,min-height:2px,padding:0px;\n`;
-          m += `class ${nodeUnion} union;\n`;
-          
-          let lineType = estado === 'MATRIMONIO' ? '---' : '-.-';
-          if (estado === 'SEPARADO' || estado === 'DIVORCIADO') lineType = '==='; 
-          
-          m += `${int._id} ${lineType} ${nodeUnion};\n`;
-          m += `${integrantes[pIdx]._id} ${lineType} ${nodeUnion};\n`;
-          
-          int._unionNode = nodeUnion;
-          integrantes[pIdx]._unionNode = nodeUnion;
+        // Para no dibujar doble (A->B y B->A), garantizamos un orden
+        if (idx < pIdx) {
+          edges.push({
+            id: `edge-rel-${edgeCounter++}`,
+            source: int._nodeId,
+            target: integrantes[pIdx]._nodeId,
+            type: 'genogramEdge',
+            sourceHandle: 'partner-out',
+            targetHandle: 'partner-in',
+            data: { relType: int.tipoPareja === 'MATRIMONIO' ? 'matrimonio' : 'union_libre' }
+          });
         }
       }
     }
-  });
 
-  // --- RELACIONES PARENTALES ---
-  integrantes.forEach((int, idx) => {
-    let pNode = int.padreId !== '' && !isNaN(parseInt(int.padreId)) ? integrantes[parseInt(int.padreId)] : null;
-    let mNode = int.madreId !== '' && !isNaN(parseInt(int.madreId)) ? integrantes[parseInt(int.madreId)] : null;
-    let descenderDe = null;
+    // Relaciones Padre/Madre a Hijo
+    const pNode = int.padreId !== '' && !isNaN(parseInt(int.padreId)) ? integrantes[parseInt(int.padreId)] : null;
+    const mNode = int.madreId !== '' && !isNaN(parseInt(int.madreId)) ? integrantes[parseInt(int.madreId)] : null;
 
-    if (pNode && mNode && pNode._unionNode && pNode._unionNode === mNode._unionNode) {
-      descenderDe = pNode._unionNode;
-    } else if (pNode && mNode) {
-      unionCounter++;
-      const nodeUnion = `U${unionCounter}`;
-      m += `${nodeUnion}(" ");\n`;
-      m += `style ${nodeUnion} width:2px,height:2px,min-height:2px,padding:0px;\n`;
-      m += `class ${nodeUnion} union;\n`;
-      m += `${pNode._id} -.- ${nodeUnion};\n`;
-      m += `${mNode._id} -.- ${nodeUnion};\n`;
-      descenderDe = nodeUnion;
-      pNode._unionNode = nodeUnion;
-      mNode._unionNode = nodeUnion;
-    } else if (pNode) {
-      descenderDe = pNode._id;
-    } else if (mNode) {
-      descenderDe = mNode._id;
+    if (pNode) {
+       edges.push({
+         id: `edge-child-${edgeCounter++}-p`,
+         source: pNode._nodeId,
+         target: int._nodeId,
+         type: 'genogramEdge',
+         sourceHandle: 'parent-out',
+         targetHandle: 'parent-in',
+         data: { relType: 'normal' }
+       });
     }
-
-    if (descenderDe) {
-      let edgeT = int.tipoHijo === 'ADOPTADO' ? '-. "Adopt." .->' : 
-                  int.tipoHijo === 'HIJASTRO' ? '-. "Crianza" .->' : '-->';
-      m += `${descenderDe} ${edgeT} ${int._id};\n`;
-    } else {
-      if (int !== jefe && !int.parejaId) {
-        const pRol = String(int.parentesco);
-        if (pRol === '7') { 
-           if (jefe.padreId || jefe.madreId) {
-             const jefPadre = jefe.padreId ? integrantes[parseInt(jefe.padreId)] : null;
-             if (jefPadre && jefPadre._unionNode) m += `${jefPadre._unionNode} -. "Hno/a" .-> ${int._id};\n`;
-             else if (jefPadre) m += `${jefPadre._id} -. "Hno/a" .-> ${int._id};\n`;
-             else {
-               const jefMadre = jefe.madreId ? integrantes[parseInt(jefe.madreId)] : null;
-               if (jefMadre) m += `${jefMadre._id} -. "Hno/a" .-> ${int._id};\n`;
-             }
-           } else {
-             m += `${jefe._id} -. "Hno/a" .- ${int._id};\n`;
-           }
-        } else if (pRol === '8') m += `${jefe._id} -. "Familiar" .- ${int._id};\n`;
-        else if (pRol === '6') m += `${jefe._id} -. "Nieto(a)" .-> ${int._id};\n`;
-        else if (pRol === '4' || pRol === '5') m += `${int._id} -.-> ${jefe._id};\n`;
-        else if (pRol === '10' || pRol === '9') m += `${jefe._id} ~~~ ${int._id};\n`;
-      }
+    if (mNode) {
+       edges.push({
+         id: `edge-child-${edgeCounter++}-m`,
+         source: mNode._nodeId,
+         target: int._nodeId,
+         type: 'genogramEdge',
+         sourceHandle: 'parent-out',
+         targetHandle: 'parent-in',
+         data: { relType: 'normal' }
+       });
     }
   });
 
-  return m;
+  return JSON.stringify({ nodes, edges });
 }

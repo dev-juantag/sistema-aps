@@ -30,14 +30,42 @@ import {
   AlertTriangle,
   Upload,
   FileSpreadsheet,
-  Loader2
+  Loader2,
+  CheckCircle,
+  Clock,
+  Ban,
+  Activity
 } from "lucide-react"
 import { useEffect } from "react"
+
+export function EstadoFacturacionBadge({ estado }: { estado?: string }) {
+  if (!estado) return <span className="text-muted-foreground">-</span>
+
+  const badges: Record<string, { label: string, color: string, icon: any }> = {
+    "NO_FACTURABLE": { label: "No Facturable", color: "bg-gray-100 text-gray-700 border-gray-200", icon: Ban },
+    "PENDIENTE": { label: "En Revisión", color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: Clock },
+    "DEVUELTA": { label: "Devuelta", color: "bg-red-100 text-red-800 border-red-200", icon: AlertTriangle },
+    "FACTURADA": { label: "Facturada", color: "bg-purple-100 text-purple-800 border-purple-200", icon: CheckCircle },
+    "EVOLUCIONADA_SAFIX": { label: "Evolucionada (Safix)", color: "bg-green-100 text-green-800 border-green-200", icon: Activity },
+    "GLOSADA": { label: "Glosada", color: "bg-orange-100 text-orange-800 border-orange-200", icon: Ban },
+    "PAGADA": { label: "Pagada", color: "bg-blue-100 text-blue-800 border-blue-200", icon: CheckCircle },
+  }
+
+  const badge = badges[estado] || badges["PENDIENTE"]
+  const Icon = badge.icon
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badge.color}`}>
+      <Icon className="h-3.5 w-3.5" />
+      {badge.label}
+    </span>
+  )
+}
 
 type SubView = "list" | "form" | "detail"
 
 export function AtencionesModule() {
-  const { user, isAdmin, isSuperAdmin } = useAuth()
+  const { user, isAdmin, isSuperAdmin, isFacturador } = useAuth()
   const [subView, setSubView] = useState<SubView>("list")
   const [selectedAtencion, setSelectedAtencion] = useState<Atencion | null>(null)
   const [search, setSearch] = useState("")
@@ -58,7 +86,7 @@ export function AtencionesModule() {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importStatus, setImportStatus] = useState<{success?: string, error?: string} | null>(null)
 
-  const atencionesUrl = isAdmin ? "/api/atenciones" : (user ? `/api/atenciones?profesionalId=${user.id}` : null)
+  const atencionesUrl = (isAdmin || isFacturador) ? "/api/atenciones" : (user ? `/api/atenciones?profesionalId=${user.id}` : null)
   const { data: atencionesData, error: errAt, mutate: mutateAtenciones } = useSWR(atencionesUrl, fetcher)
   const { data: stageData, error: errSt } = useSWR(user ? "/api/settings/stage" : null, fetcher)
   const { data: programasData, error: errPr } = useSWR(user ? "/api/programas" : null, fetcher)
@@ -67,6 +95,12 @@ export function AtencionesModule() {
   const atenciones: Atencion[] = useMemo(() => Array.isArray(atencionesData) ? atencionesData : [], [atencionesData])
   const programas: {id: string, nombre: string}[] = useMemo(() => Array.isArray(programasData) ? programasData : [], [programasData])
   const currentStageStart: string | null = useMemo(() => stageData?.currentStageStart || null, [stageData])
+  
+  const isEnfermeria = () => {
+    if (!user || user.rol?.toLowerCase() !== 'profesional' || !user.programaId) return false;
+    const prog = programas.find((p: any) => String(p.id) === String(user.programaId));
+    return prog ? prog.nombre.toLowerCase().includes('enfermer') : false;
+  }
   
   // Exponemos la función de mutate para cuando se crea o elimina un registro
   const triggerRefresh = () => {
@@ -125,7 +159,11 @@ export function AtencionesModule() {
   const handleDelete = async (id: string) => {
     if (!confirm("¿Está seguro de que desea eliminar esta atención? Esta acción no se puede deshacer.")) return;
     try {
-      const res = await fetch(`/api/atenciones/${id}`, { method: "DELETE" });
+      const token = localStorage.getItem("salud-pereira-token")
+      const res = await fetch(`/api/atenciones/${id}`, { 
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
       if (res.ok) {
         triggerRefresh()
       } else {
@@ -147,6 +185,8 @@ export function AtencionesModule() {
           setSubView("list")
           setSelectedAtencion(null)
         }} 
+        user={user}
+        triggerRefresh={triggerRefresh}
       />
     )
   }
@@ -187,8 +227,9 @@ export function AtencionesModule() {
 
     const headers = [
       "Fecha y Hora de registro", "Paciente Nombre", "Documento", "Tipo_Doc", "Genero", 
-      ...(isSuperAdmin ? ["Telefono"] : []), "Direccion", "Edad", "Fecha_Nacimiento", "Programa", 
-      "Profesional", "Nota_Valoracion"
+      ...(isSuperAdmin || user?.rol === 'FACTURADOR' ? ["Telefono"] : []), "Direccion", "Edad", "Fecha_Nacimiento",
+      "Regimen", "EAPB", "Programa", "Profesional", "Nota_Valoracion",
+      ...(isSuperAdmin || user?.rol === 'FACTURADOR' ? ["Estado Facturacion", "Observacion Facturacion"] : [])
     ]
     
     const escapeCsv = (str?: string) => {
@@ -202,13 +243,16 @@ export function AtencionesModule() {
       escapeCsv(a.pacienteDocumento),
       escapeCsv(a.pacienteTipoDoc),
       escapeCsv(a.pacienteGenero),
-      ...(isSuperAdmin ? [escapeCsv(a.pacienteTelefono)] : []),
+      ...(isSuperAdmin || user?.rol === 'FACTURADOR' ? [escapeCsv(a.pacienteTelefono)] : []),
       escapeCsv(a.pacienteDireccion),
       calcularEdad(a.pacienteFechaNac)?.toString() || "",
       a.pacienteFechaNac || "",
+      escapeCsv(a.pacienteRegimen),
+      escapeCsv(a.pacienteEapb),
       escapeCsv(programas.find(p => p.id === a.programaId)?.nombre),
       escapeCsv(a.profesionalNombre),
-      escapeCsv(a.notaValoracion)
+      escapeCsv(a.notaValoracion),
+      ...(isSuperAdmin || user?.rol === 'FACTURADOR' ? [escapeCsv(a.estadoFacturacion), escapeCsv(a.observacionFacturacion)] : [])
     ])
     
     // Auditory Watermark Metadata
@@ -276,9 +320,13 @@ export function AtencionesModule() {
         }
 
         // Enviamos el CSV completo a la API
+        const token = localStorage.getItem("salud-pereira-token")
         const resp = await fetch('/api/atenciones/importar', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ csv: text })
         })
 
@@ -302,18 +350,24 @@ export function AtencionesModule() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Atenciones</h1>
+          <h1 className="text-2xl font-bold text-foreground">
+            {isFacturador ? "Facturaciones" : "Atenciones"}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            {isAdmin
+            {isFacturador
+              ? "Gestión de facturación territorial"
+              : isAdmin
               ? "Historial completo de atenciones registradas"
+              : isEnfermeria() 
+              ? "Historial de atenciones registradas en su territorio"
               : "Historial de tus atenciones registradas"}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
           {isSuperAdmin && (
             <button
               onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer w-full sm:w-auto"
             >
               <Upload className="h-4 w-4" />
               Importar
@@ -321,18 +375,18 @@ export function AtencionesModule() {
           )}
           <button
             onClick={() => setShowExportModal(true)}
-            className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+            className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer w-full sm:w-auto"
           >
             <Download className="h-4 w-4" />
-            Descargar Excel
+            Descargar
           </button>
           {(!isAdmin || isSuperAdmin) && (
             <button
               onClick={() => setSubView("form")}
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer w-full sm:w-auto text-center"
             >
               <Plus className="h-4 w-4" />
-              Nueva atencion
+              Nueva
             </button>
           )}
         </div>
@@ -392,17 +446,14 @@ export function AtencionesModule() {
                 <th className="px-4 py-3 text-left font-semibold text-foreground hidden sm:table-cell">
                   Documento
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-foreground hidden sm:table-cell">
-                  Teléfono
-                </th>
                 <th className="px-4 py-3 text-left font-semibold text-foreground hidden md:table-cell">
                   Programa
                 </th>
                 <th className="px-4 py-3 text-left font-semibold text-foreground hidden lg:table-cell">
                   Profesional
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-foreground hidden xl:table-cell">
-                  Nota
+                <th className="px-4 py-3 text-left font-semibold text-foreground">
+                  Estado Fact.
                 </th>
                 <th className="px-4 py-3 text-center font-semibold text-foreground">
                   Acciones
@@ -412,19 +463,19 @@ export function AtencionesModule() {
             <tbody>
               {errAt || errSt || errPr ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-destructive">
+                  <td colSpan={7} className="px-4 py-12 text-center text-destructive">
                     Error al cargar: {errAt?.message || errSt?.message || errPr?.message || "Error desconocido"}
                   </td>
                 </tr>
               ) : loading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
                     Cargando atenciones...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
                     No se encontraron atenciones.
                   </td>
                 </tr>
@@ -441,23 +492,20 @@ export function AtencionesModule() {
                   const renderRow = (a: Atencion) => (
                     <tr key={a.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 text-foreground whitespace-nowrap">{a.fecha}</td>
-                      <td className="px-4 py-3 font-medium text-foreground">{a.pacienteNombre}</td>
+                      <td className="px-4 py-3 font-medium text-foreground min-w-[150px]">{a.pacienteNombre}</td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
                         {a.pacienteDocumento}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
-                        {a.pacienteTelefono}
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
                         <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                           {programas.find(p => p.id === a.programaId)?.nombre || "Desconocido"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">
+                      <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell whitespace-nowrap">
                         {a.profesionalNombre}
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground hidden xl:table-cell max-w-xs truncate">
-                        {a.notaValoracion}
+                      <td className="px-4 py-3">
+                        <EstadoFacturacionBadge estado={a.estadoFacturacion} />
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
@@ -467,7 +515,7 @@ export function AtencionesModule() {
                               setSubView("detail")
                             }}
                             className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded-md hover:bg-muted"
-                            title="Ver detalles"
+                            title="Ver detalles / Facturación"
                             aria-label="Ver detalles"
                           >
                             <Eye className="h-4 w-4" />
@@ -494,7 +542,7 @@ export function AtencionesModule() {
                       {historicalAtenciones.length > 0 && (
                         <>
                           <tr>
-                            <td colSpan={8} className="px-4 py-2 bg-muted/20 border-y border-border text-xs font-semibold text-muted-foreground uppercase opacity-80 tracking-wide text-center">
+                            <td colSpan={7} className="px-4 py-2 bg-muted/20 border-y border-border text-xs font-semibold text-muted-foreground uppercase opacity-80 tracking-wide text-center">
                               Atenciones anteriores / Histórico
                             </td>
                           </tr>
@@ -851,9 +899,13 @@ function AtencionForm({
 
     setIsSubmitting(true)
     try {
+      const token = localStorage.getItem("salud-pereira-token")
       const res = await fetch("/api/atenciones", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({
           programaId,
           pacienteNombre: nombrePaciente.trim(),
@@ -985,14 +1037,14 @@ function AtencionForm({
               </FormField>
             </div>
 
-            <FormField label="Genero o Sexo" required error={errors.genero}>
+            <FormField label="Género" required error={errors.genero}>
               <select
                 value={genero}
                 onChange={(e) => setGenero(e.target.value)}
                 disabled={shouldDisablePacienteInfo}
                 className="form-input disabled:bg-muted disabled:opacity-75"
               >
-                <option value="">Seleccione genero/sexo</option>
+                <option value="">Seleccione género</option>
                 {SEXO.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.label}
@@ -1007,7 +1059,7 @@ function AtencionForm({
                 inputMode="numeric"
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                placeholder="3123456789"
+                placeholder="321*******"
                 className="form-input"
               />
             </FormField>
@@ -1047,8 +1099,7 @@ function AtencionForm({
               <select
                 value={regimen}
                 onChange={(e) => setRegimen(e.target.value)}
-                disabled={shouldDisablePacienteInfo}
-                className="form-input disabled:bg-muted disabled:opacity-75"
+                className="form-input"
               >
                 <option value="">Seleccione el régimen</option>
                 {REGIMEN_SALUD.map((r) => (
@@ -1066,8 +1117,7 @@ function AtencionForm({
                 value={eapb}
                 onChange={(e) => setEapb(e.target.value)}
                 placeholder="Escriba o elija la EPS"
-                disabled={shouldDisablePacienteInfo}
-                className="form-input disabled:bg-muted disabled:opacity-75"
+                className="form-input"
               />
               <datalist id="eps-list-atencion">
                 <option value="Nueva EPS" />
@@ -1169,12 +1219,53 @@ function AtencionDetail({
   atencion,
   programas,
   onBack,
+  user,
+  triggerRefresh
 }: {
   atencion: Atencion
   programas: {id: string, nombre: string}[]
   onBack: () => void
+  user: any
+  triggerRefresh: () => void
 }) {
   const programaNombre = programas.find((p) => p.id === atencion.programaId)?.nombre || "Desconocido"
+  
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [localEstado, setLocalEstado] = useState(atencion.estadoFacturacion || "PENDIENTE")
+  const [localObservacion, setLocalObservacion] = useState(atencion.observacionFacturacion || "")
+
+  const canManageFacturacion = 
+    user?.rol === 'ADMIN' || 
+    user?.rol === 'admin' ||
+    user?.rol === 'SUPERADMIN' || 
+    user?.rol === 'superadmin' ||
+    user?.rol === 'FACTURADOR' || 
+    user?.rol === 'facturador'
+
+  const handleUpdateFacturacion = async () => {
+    try {
+      setIsUpdating(true)
+      const res = await fetch(`/api/atenciones/${atencion.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          estadoFacturacion: localEstado,
+          observacionFacturacion: localObservacion
+        })
+      })
+      if (res.ok) {
+        triggerRefresh()
+        alert("Estado de facturación actualizado")
+      } else {
+        const error = await res.json()
+        alert(`Error: ${error.error || "No se pudo actualizar"}`)
+      }
+    } catch (err) {
+      alert("Error de conexión.")
+    } finally {
+      setIsUpdating(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto">
@@ -1246,6 +1337,71 @@ function AtencionDetail({
         <FormSection icon={<FileText className="h-5 w-5" />} title="Nota de Valoración">
           <div className="rounded-xl border border-border bg-muted/20 p-5 text-base text-foreground whitespace-pre-wrap leading-relaxed">
             {atencion.notaValoracion}
+          </div>
+        </FormSection>
+
+        {/* FACTURACION SECTION */}
+        <FormSection icon={<Activity className="h-5 w-5" />} title="Estado de Facturación">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-6">
+              <div className="w-full sm:w-1/3">
+                <label className="text-sm font-semibold text-foreground mb-2 block">Estado Actual</label>
+                {(canManageFacturacion || (user?.rol === 'PROFESIONAL' && atencion.estadoFacturacion === 'FACTURADA')) ? (
+                  <select
+                    value={localEstado}
+                    onChange={(e) => setLocalEstado(e.target.value)}
+                    className="form-input w-full"
+                  >
+                    {canManageFacturacion && (
+                      <>
+                        <option value="PENDIENTE">Pendiente (En Revisión)</option>
+                        <option value="FACTURADA">Facturada</option>
+                        <option value="DEVUELTA">Devuelta</option>
+                        <option value="NO_FACTURABLE">No Facturable</option>
+                        <option value="GLOSADA">Glosada</option>
+                        <option value="PAGADA">Pagada</option>
+                      </>
+                    )}
+                    {/* El Profesional solo puede marcar Evolucionada si está Facturada */}
+                    <option value="EVOLUCIONADA_SAFIX">Evolucionada (SAFIX)</option>
+                  </select>
+                ) : (
+                  <div className="p-2 border border-border rounded-lg bg-muted text-sm">
+                    <EstadoFacturacionBadge estado={atencion.estadoFacturacion} />
+                  </div>
+                )}
+              </div>
+
+              <div className="w-full sm:w-2/3 flex flex-col gap-2">
+                 <label className="text-sm font-semibold text-foreground block">Observaciones / Motivo de devolución</label>
+                 {canManageFacturacion ? (
+                   <textarea
+                     rows={3}
+                     value={localObservacion}
+                     onChange={(e) => setLocalObservacion(e.target.value)}
+                     className="form-input text-sm"
+                     placeholder="Escriba aqui comentarios sobre el cobro o indique por qué la está devolviendo..."
+                   />
+                 ) : (
+                   <div className="p-3 border border-border rounded-lg min-h-[50px] bg-muted/30 text-sm whitespace-pre-wrap">
+                     {localObservacion || <span className="text-muted-foreground italic">Sin observaciones</span>}
+                   </div>
+                 )}
+              </div>
+            </div>
+
+            {(canManageFacturacion || (user?.rol === 'PROFESIONAL' && atencion.estadoFacturacion === 'FACTURADA' && localEstado === 'EVOLUCIONADA_SAFIX')) && (
+              <div className="flex justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={handleUpdateFacturacion}
+                  disabled={isUpdating}
+                  className="rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {isUpdating ? "Guardando..." : "Actualizar Facturación"}
+                </button>
+              </div>
+            )}
           </div>
         </FormSection>
       </div>

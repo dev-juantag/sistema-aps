@@ -10,7 +10,7 @@ import { verifyToken } from "@/lib/verify-token";
 
 export async function GET(req: Request) {
   try {
-    const auth = verifyToken(req);
+    const auth = await verifyToken(req);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -31,6 +31,13 @@ export async function GET(req: Request) {
         activo: true,
         programaId: true,
         territorioId: true,
+        territoriosAsignados: {
+          select: {
+            id: true,
+            nombre: true,
+            codigo: true
+          }
+        },
         telefono: true,
         createdAt: true,
         lastLogin: true,
@@ -46,6 +53,7 @@ export async function GET(req: Request) {
     const formattedUsers = users.map((u) => ({
       ...u,
       rol: u.rol.toLowerCase(),
+      territorioIds: u.territoriosAsignados.map(t => t.id)
     }));
 
     return NextResponse.json(formattedUsers);
@@ -61,7 +69,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const auth = verifyToken(req);
+    const auth = await verifyToken(req);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -81,7 +89,7 @@ export async function POST(req: Request) {
 
     const upperRol = typeof rol === 'string' ? rol.toUpperCase() : "AUXILIAR";
     const validRolesWithPrograma = ["PROFESIONAL"];
-    const validRolesWithTerritorio = ["AUXILIAR", "PROFESIONAL"];
+    const validRolesWithTerritorio = ["AUXILIAR", "PROFESIONAL", "FACTURADOR"];
 
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -130,6 +138,9 @@ export async function POST(req: Request) {
         rol: upperRol as any,
         programaId: validRolesWithPrograma.includes(upperRol) ? programaId || null : null,
         territorioId: validRolesWithTerritorio.includes(upperRol) ? territorioId || null : null,
+        territoriosAsignados: upperRol === "FACTURADOR" && Array.isArray(body.territorioIds) 
+          ? { connect: body.territorioIds.map((id: string) => ({ id })) } 
+          : undefined,
       },
       select: { id: true, nombre: true, apellidos: true, rol: true, email: true } // No deovolver password
     });

@@ -41,7 +41,7 @@ interface NavItem {
 }
 
 export function Dashboard() {
-  const { user, logout, isAdmin } = useAuth()
+  const { user, logout, isAdmin, isFacturador } = useAuth()
   const [activeView, setActiveView] = useState<View>("inicio")
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -54,15 +54,23 @@ export function Dashboard() {
     return prog ? prog.nombre.toLowerCase().includes('enfermer') : false;
   }
 
+  const isPsicologiaSocial = () => {
+    if (!user || user.rol !== 'profesional' || !user.programaId) return false;
+    const prog = programas.find((p: any) => String(p.id) === String(user.programaId));
+    if (!prog) return false;
+    const n = prog.nombre.toLowerCase();
+    return n.includes('psicolog') || n.includes('trabaj') || n.includes('desarrollo familiar');
+  }
+
   const navItems: NavItem[] = [
     { id: "inicio", label: "Inicio", icon: <LayoutDashboard className="h-5 w-5" /> },
   ]
   
-  if (user?.rol === "profesional" || isAdmin || user?.rol === "superadmin") {
-    navItems.push({ id: "atenciones", label: "Atenciones", icon: <ClipboardList className="h-5 w-5" /> })
+  if (user?.rol === "profesional" || isAdmin || isFacturador) {
+    navItems.push({ id: "atenciones", label: isFacturador ? "Facturaciones" : "Atenciones", icon: <ClipboardList className="h-5 w-5" /> })
   }
   
-  if (user?.rol === "auxiliar" || isAdmin || user?.rol === "superadmin" || isEnfermeria()) {
+  if (user?.rol === "auxiliar" || isAdmin || user?.rol === "superadmin" || isEnfermeria() || isPsicologiaSocial()) {
     navItems.push({ id: "identificaciones", label: "Identificaciones", icon: <Database className="h-5 w-5" /> })
   }
 

@@ -6,9 +6,20 @@ import { useState, useEffect } from 'react'
 import { inp, sel, card, cardBorder, lbl, lblStyle, required as reqStyle, chk, chkLabel } from './wizardStyles'
 
 export default function Step3Familia() {
-  const { register, watch, setValue } = useFormContext()
+  const { register, watch, setValue, getValues } = useFormContext()
   const cuidador = watch('cuidadorPrincipal')
-  const [apgarScores, setApgarScores] = useState<number[]>([0, 0, 0, 0, 0])
+  const [apgarScores, setApgarScores] = useState<number[]>(() => {
+    const savedRespuestas = getValues('apgarRespuestas');
+    if (Array.isArray(savedRespuestas) && savedRespuestas.length === 5) {
+      return savedRespuestas;
+    }
+    const saved = getValues('apgar');
+    if (saved === '1') return [4, 4, 3, 3, 3]; // 17 pts
+    if (saved === '2') return [3, 3, 3, 2, 2]; // 13 pts
+    if (saved === '3') return [2, 2, 2, 2, 2]; // 10 pts
+    if (saved === '4') return [1, 1, 1, 1, 1]; // 5 pts
+    return [0, 0, 0, 0, 0];
+  })
 
   const total = apgarScores.reduce((a, b) => a + b, 0)
   const apgarCat = total >= 17 ? 1 : total >= 13 ? 2 : total >= 10 ? 3 : 4
@@ -22,8 +33,9 @@ export default function Step3Familia() {
   }
 
   useEffect(() => {
+    setValue('apgarRespuestas', apgarScores, { shouldValidate: true })
     setValue('apgar', String(apgarCat), { shouldValidate: true })
-  }, [apgarCat, setValue])
+  }, [apgarCat, apgarScores, setValue])
 
   return (
     <div className="space-y-4">

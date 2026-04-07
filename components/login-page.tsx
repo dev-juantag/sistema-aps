@@ -1,17 +1,29 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { Heart, Loader2, Eye, EyeOff } from "lucide-react"
 import { COMPANY_NAME } from "@/lib/constants"
+import { useSearchParams, useRouter } from "next/navigation"
 
-export function LoginPage() {
+function LoginForm() {
   const { login } = useAuth()
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get("expired") === "true") {
+      setError("Tu sesión ha expirado o el token es inválido. Por favor, inicia sesión nuevamente.")
+      // Remove it from the URL
+      router.replace("/")
+    }
+  }, [searchParams, router])
   const [view, setView] = useState<"login" | "recovery">("login")
   const [recoveryStep, setRecoveryStep] = useState<"request" | "verify" | "reset">("request")
   const [recoveryCode, setRecoveryCode] = useState("")
@@ -384,5 +396,17 @@ const handleResetSubmit = async (e: React.FormEvent) => {
         </p>
       </div>
     </div>
+  )
+}
+
+export function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-primary/5">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }

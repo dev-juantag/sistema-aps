@@ -12,12 +12,20 @@ export async function GET(request: Request) {
     let whereFicha: any = {}
 
     if (role === 'SUPERADMIN' || role === 'ADMIN') {
-      if (territorioId) whereFicha.territorioId = territorioId
+      if (territorioId) {
+        if (territorioId.includes(',')) {
+          whereFicha.territorioId = { in: territorioId.split(',') }
+        } else {
+          whereFicha.territorioId = territorioId
+        }
+      }
     } else {
-      if (role === "auxiliar" && territorioId) {
-        whereFicha.territorioId = territorioId
-      } else if (territorioId) {
-        whereFicha.territorioId = territorioId
+      if (territorioId) {
+        if (territorioId.includes(',')) {
+          whereFicha.territorioId = { in: territorioId.split(',') }
+        } else {
+          whereFicha.territorioId = territorioId
+        }
       }
       
       const settings = await prisma.systemSettings.findFirst()

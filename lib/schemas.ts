@@ -55,9 +55,9 @@ export const integranteSchema = z.object({
   eapb: z.string().optional().nullable(),
   etnia: z.string().optional().nullable(),
   puebloIndigena: z.string().optional().nullable(),
-  grupoPoblacional: z.array(z.number()).default([]),
-  barrerasAcceso: z.array(z.number()).default([]),
-  discapacidades: z.array(z.number()).default([]),
+  grupoPoblacional: z.array(z.coerce.number()).default([]),
+  barrerasAcceso: z.array(z.coerce.number()).default([]),
+  discapacidades: z.array(z.coerce.number()).default([]),
 
   // V. EVALUACIÓN SALUD (Step 5)
   antecedentes: z.record(z.boolean()).optional().default({}),
@@ -90,6 +90,8 @@ export const wizardSchema = z.object({
   centroPoblado: z.string().optional().nullable().transform(v => v?.toUpperCase() || ''),
   descripcionUbicacion: z.string().optional().nullable(),
   direccion: z.string().min(1, 'Requerido').transform(v => v.toUpperCase()),
+  latitud: z.string().optional().nullable(),
+  longitud: z.string().optional().nullable(),
   uzpe: z.string().optional().nullable(),
   numEBS: z.string().min(1, 'Requerido'),
   prestadorPrimario: z.string().min(1, 'Requerido'),
@@ -129,7 +131,8 @@ export const wizardSchema = z.object({
   // STEP 3: Familia
   tipoFamilia: z.string().min(1, 'Requerido'),
   numIntegrantes: z.string().min(1, 'Requerido'),
-  apgar: z.string().min(1, 'Requerido'),
+  apgar: z.string().optional().nullable(),
+  apgarRespuestas: z.array(z.number()).optional(),
   ecomapa: z.string().optional().nullable(),
   cuidadorPrincipal: z.boolean().optional().default(false),
   zarit: z.string().optional().nullable(),

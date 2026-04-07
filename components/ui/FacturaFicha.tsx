@@ -5,6 +5,7 @@ import {
   VULNERABILIDADES, DIAGNOSTICO_NUTRICIONAL, PARENTESCO, REGIMEN_SALUD, OCUPACION
 } from '@/lib/constants'
 import FamiliogramaViewer from './FamiliogramaViewer'
+import FamiliogramaStaticViewer from './FamiliogramaStaticViewer'
 
 export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha: any, autoPrint?: boolean, showOnScreen?: boolean }) {
   if (!ficha) return null
@@ -46,7 +47,7 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
   const Td = ({ children, className }: { children: React.ReactNode, className?: string }) => <td className={`${tdCls} ${className || ''}`}>{children}</td>
 
   return (
-    <div className={`${showOnScreen ? 'block' : 'hidden print:block'} font-sans text-black bg-white w-full max-w-none mx-auto p-4 md:p-8 leading-normal print:p-0`}>
+    <div className={`${showOnScreen ? 'block' : 'absolute w-[1024px] h-[500px] overflow-hidden -z-50 opacity-0 pointer-events-none print:static print:w-full print:h-auto print:opacity-100 print:overflow-visible print:pointer-events-auto'} font-sans text-black bg-white max-w-none mx-auto p-4 md:p-8 leading-normal print:p-0`}>
       
       {/* HEADER GLOBAL */}
       <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: '4px solid black' }}>
@@ -160,13 +161,13 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
                 <tr><Th>Presencia de Vectores</Th><Td>{ficha.presenciaVectores ? 'Identificada' : 'No identificada'}</Td></tr>
                 <tr><Th>Tenencia de Mascotas</Th><Td>{getLabels(ANIMALES, ficha.animales)} (Total: {ficha.cantAnimales || 0})</Td></tr>
                 {(ficha.cantAnimales > 0) && (
-                  <tr><Th>Vacunación de Mascotas</Th><Td>{ficha.vacunacionMascotas ? 'Al día' : 'Pendiente / No informa'}</Td></tr>
+                  <tr><Th>Vacunación de Mascotas</Th><Td>{ficha.vacunacionMascotas ? 'Requiere / Pendiente' : 'Al día'}</Td></tr>
                 )}
               </tbody>
             </table>
           </div>
 
-          <div className={sectionCls} style={{ pageBreakAfter: 'always' }}>
+          <div className={sectionCls}>
             <h2 className={headerCls}>6. Composición y Dinámica Familiar</h2>
             <table className={tblCls}>
               <tbody>
@@ -201,10 +202,14 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
             </div>
             
             {ficha.familiogramaCodigo && (
-              <div className="mt-6 mb-6 page-break-inside-avoid">
-                <h2 className={headerCls}>9. Familiograma Autogenerado</h2>
+              <div className="mt-8 mb-6 print:break-inside-avoid">
+                <h2 className={headerCls}>9. Familiograma Clínico</h2>
                 <div className="border border-slate-300 rounded overflow-hidden">
-                  <FamiliogramaViewer code={ficha.familiogramaCodigo} />
+                  {!String(ficha.familiogramaCodigo).startsWith('{') ? (
+                    <FamiliogramaViewer code={ficha.familiogramaCodigo} />
+                  ) : (
+                    <FamiliogramaStaticViewer jsonString={ficha.familiogramaCodigo} />
+                  )}
                 </div>
               </div>
             )}
@@ -212,15 +217,17 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
 
           {integranteChunks.length > 0 ? (
             integranteChunks.map((chunk, chunkIdx) => (
-              <div key={chunkIdx} className={chunkIdx < integranteChunks.length - 1 ? sectionCls : "mb-8"} style={chunkIdx < integranteChunks.length - 1 ? { pageBreakAfter: 'always' } : {}}>
+              <div key={chunkIdx} className={chunkIdx < integranteChunks.length - 1 ? sectionCls : "mb-8 print:mb-0"} style={chunkIdx < integranteChunks.length - 1 ? { pageBreakAfter: 'always' } : {}}>
                 {chunkIdx === 0 && <h2 className={headerCls}>10. Censo e Información de Integrantes</h2>}
                 {chunk.map((int: any, intIdx: number) => {
                   const globalIdx = chunkIdx * 3 + intIdx + 1;
                   return (
-                    <div key={int.id || intIdx} className="mb-8 border-b-2 border-dashed border-gray-400 pb-4 last:border-0 page-break-inside-avoid">
+                    <div key={int.id || intIdx} className="mb-8 print:last:mb-0 border-b-2 border-dashed border-gray-400 pb-4 last:border-0 page-break-inside-avoid">
                       <div className="flex items-center gap-2 mb-3">
                          <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-sm">#{globalIdx}</div>
-                         <h3 className="font-black text-base uppercase">{int.primerNombre} {int.primerApellido} {int.segundoApellido}</h3>
+                         <h3 className="font-black text-base uppercase">
+                           {int.nombres ? `${int.nombres} ${int.apellidos}` : `${int.primerNombre || ''} ${int.segundoNombre || ''} ${int.primerApellido || ''} ${int.segundoApellido || ''}`.trim()}
+                         </h3>
                       </div>
 
                       <div className="grid grid-cols-2 gap-x-8">
@@ -228,7 +235,7 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
                           <tbody>
                             <tr><th className="font-bold py-1 w-2/5 border-b border-gray-100">Documento:</th><td className="py-1 border-b border-gray-100 uppercase">{int.tipoDoc} {int.documento || int.numDoc}</td></tr>
                             <tr><th className="font-bold py-1 border-b border-gray-100">Nacimiento:</th><td className="py-1 border-b border-gray-100">{int.fechaNacimiento} ({calculateAge(int.fechaNacimiento)} años)</td></tr>
-                            <tr><th className="font-bold py-1 border-b border-gray-100">Sexo:</th><td className="py-1 border-b border-gray-100 uppercase">{int.sexo}</td></tr>
+                            <tr><th className="font-bold py-1 border-b border-gray-100">Género:</th><td className="py-1 border-b border-gray-100 uppercase">{int.sexo}</td></tr>
                             <tr><th className="font-bold py-1 border-b border-gray-100">Parentesco:</th><td className="py-1 border-b border-gray-100 uppercase">{getLabel(PARENTESCO, int.parentesco)}</td></tr>
                             <tr><th className="font-bold py-1 border-b border-gray-100">Régimen / EAPB:</th><td className="py-1 border-b border-gray-100 uppercase">{getLabel(REGIMEN_SALUD, int.regimen)} / {int.eapb || '-'}</td></tr>
                             <tr><th className="font-bold py-1 border-b border-gray-100">Ocupación:</th><td className="py-1 border-b border-gray-100 uppercase">{getLabel(OCUPACION, int.ocupacion)}</td></tr>
@@ -293,9 +300,9 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
       )}
 
       {/* FOOTER LEGAL GLOBAL */}
-      <div className="mt-8 text-center text-xs text-gray-500 uppercase italic pt-4" style={{ borderTop: '2px solid black', pageBreakInside: 'avoid' }}>
-        <p className="font-bold">** DOCUMENTO DE CARÁCTER CONFIDENCIAL Y RESTRINGIDO **</p>
-        <p className="mt-1 normal-case text-[10px]">Los datos de salud e identificación familiar (APS) pertenecen al sistema departamental y su uso está regulado por la Ley de Protección de Datos Personales.</p>
+      <div className="mt-4 print:mt-1 text-center text-xs text-gray-500 uppercase italic pt-3 font-sans" style={{ borderTop: '2px solid black', pageBreakInside: 'avoid' }}>
+        <p className="font-bold text-black" style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>** DOCUMENTO DE CARÁCTER CONFIDENCIAL Y RESTRINGIDO **</p>
+        <p className="mt-0.5 normal-case text-[10px]">Los datos de salud e identificación familiar (APS) pertenecen al sistema departamental y su uso está regulado por la Ley de Protección de Datos Personales.</p>
         <p className="mt-1 font-sans text-[9px]">{ficha.id}</p>
       </div>
     </div>

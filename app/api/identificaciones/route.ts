@@ -1,17 +1,17 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Force reload cache next.js
+
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 import { PARENTESCO, SEXO } from "@/lib/constants"
 import { verifyToken } from "@/lib/verify-token"
-
-import { generateFamiliogramaMermaid } from "@/lib/familiograma"
-
+import { generateFamiliogramaAutoLayout } from "@/lib/familiograma"
 export async function GET(req: Request) {
 
   try {
-    const auth = verifyToken(req);
+    const auth = await verifyToken(req);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -19,8 +19,12 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const requestedTerritorioId = searchParams.get('territorioId')
     
-    const userRole = auth.decoded?.rol;
-    const userTerritorioId = auth.decoded?.userId; // Might need to fetch user's own territory, but leaving logic mostly intact
+    const userRole = auth.decoded?.rol?.toUpperCase();
+    const userId = auth.decoded?.userId;
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { territoriosAsignados: true }
+    });
 
     let whereClause: any = {}
 
@@ -29,7 +33,14 @@ export async function GET(req: Request) {
       if (requestedTerritorioId) whereClause.territorioId = requestedTerritorioId
     } else {
       // Para roles normales, forzar filtro estricto por Territorio y por FECHA (solo historial de esta etapa)
-      if (requestedTerritorioId) {
+      if (userRole === 'FACTURADOR') {
+        const assignedTIds = currentUser?.territoriosAsignados?.map((t: any) => t.id) || [];
+        if (assignedTIds.length > 0) {
+          whereClause.territorioId = { in: assignedTIds };
+        } else if (currentUser?.territorioId) {
+          whereClause.territorioId = currentUser.territorioId;
+        }
+      } else if (requestedTerritorioId) {
         whereClause.territorioId = requestedTerritorioId
       }
       
@@ -39,16 +50,60 @@ export async function GET(req: Request) {
       }
     }
 
-    const fichas = await (prisma.fichaHogar as any).findMany({
-      where: whereClause,
-      include: {
-        territorio: { select: { id: true, nombre: true, codigo: true } },
-        encuestador: { select: { nombre: true, apellidos: true, documento: true } },
-        pacientes: { select: { documento: true } },
-        _count: { select: { pacientes: true } }
-      },
-      orderBy: { createdAt: 'desc' }
-    })
+    const searchStr = searchParams.get('search')
+    if (searchStr) {
+      whereClause.OR = [
+        { direccion: { contains: searchStr, mode: 'insensitive' } },
+        { microterritorio: { contains: searchStr, mode: 'insensitive' } },
+        { pacientes: { some: { documento: { contains: searchStr } } } },
+        { encuestador: { nombre: { contains: searchStr, mode: 'insensitive' } } },
+        { encuestador: { documento: { contains: searchStr } } },
+        { encuestadorDocRaw: { contains: searchStr } },
+        { encuestadorNombreRaw: { contains: searchStr, mode: 'insensitive' } },
+      ]
+    }
+
+    const pageStr = searchParams.get('page')
+    const limitStr = searchParams.get('limit')
+    
+    // Pagination defaults: if provided use them, else return all.
+    const hasPagination = pageStr && limitStr
+    const page = hasPagination ? parseInt(pageStr) : 1
+    const limit = hasPagination ? parseInt(limitStr) : 0
+    const skip = hasPagination ? (page - 1) * limit : 0
+
+    let fichas;
+    let totalCount = 0;
+
+    if (hasPagination) {
+      [totalCount, fichas] = await prisma.$transaction([
+        (prisma.fichaHogar as any).count({ where: whereClause }),
+        (prisma.fichaHogar as any).findMany({
+          where: whereClause,
+          skip,
+          take: limit,
+          include: {
+            territorio: { select: { id: true, nombre: true, codigo: true } },
+            encuestador: { select: { nombre: true, apellidos: true, documento: true } },
+            pacientes: { select: { documento: true } },
+            _count: { select: { pacientes: true } }
+          },
+          orderBy: { createdAt: 'desc' }
+        })
+      ])
+    } else {
+      fichas = await (prisma.fichaHogar as any).findMany({
+        where: whereClause,
+        include: {
+          territorio: { select: { id: true, nombre: true, codigo: true } },
+          encuestador: { select: { nombre: true, apellidos: true, documento: true } },
+          pacientes: { select: { documento: true } },
+          _count: { select: { pacientes: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      })
+      totalCount = fichas.length
+    }
 
     const formattedFichas = fichas.map((f: any) => ({
       id: f.id,
@@ -79,6 +134,18 @@ export async function GET(req: Request) {
       integrantesDocs: f.pacientes.map((p: any) => p.documento),
     }))
 
+    if (hasPagination) {
+      return NextResponse.json({
+        fichas: formattedFichas,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      })
+    }
+
     return NextResponse.json(formattedFichas)
 
   } catch (error) {
@@ -92,7 +159,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const auth = verifyToken(req);
+    const auth = await verifyToken(req);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -171,11 +238,12 @@ export async function POST(req: Request) {
       tipoFamilia: isEfectiva ? (hogarData.tipoFamilia ? parseInt(hogarData.tipoFamilia) : null) : null,
       numIntegrantes: isEfectiva ? (hogarData.numIntegrantes ? parseInt(hogarData.numIntegrantes) : null) : 0,
       apgar: isEfectiva ? (hogarData.apgar ? parseInt(hogarData.apgar) : null) : null,
+      apgarRespuestas: isEfectiva && Array.isArray(hogarData.apgarRespuestas) ? hogarData.apgarRespuestas : [],
       ecomapa: isEfectiva ? (hogarData.ecomapa ? parseInt(hogarData.ecomapa) : null) : null,
       cuidadorPrincipal: isEfectiva ? (hogarData.cuidadorPrincipal === true || hogarData.cuidadorPrincipal === 'true') : false,
       zarit: isEfectiva ? (hogarData.zarit ? parseInt(hogarData.zarit) : null) : null,
       vulnerabilidades: isEfectiva ? (Array.isArray(hogarData.vulnerabilidades) ? hogarData.vulnerabilidades : []) : [],
-      familiogramaCodigo: isEfectiva && hogarData.familiogramaCodigo ? hogarData.familiogramaCodigo : (finalIntegrantes.length > 0 ? generateFamiliogramaMermaid(finalIntegrantes) : null),
+      familiogramaCodigo: isEfectiva && hogarData.familiogramaCodigo ? hogarData.familiogramaCodigo : (finalIntegrantes.length > 0 ? generateFamiliogramaAutoLayout(finalIntegrantes) : null),
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -235,6 +303,9 @@ export async function POST(req: Request) {
         }
       }
       return ficha
+    }, {
+      maxWait: 15000, 
+      timeout: 30000 
     })
 
     return NextResponse.json({

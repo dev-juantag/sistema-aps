@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
-type Role = "superadmin" | "admin" | "profesional" | "auxiliar"
+type Role = "superadmin" | "admin" | "profesional" | "auxiliar" | "facturador" | "ADMIN" | "PROFESIONAL" | "SUPERADMIN" | "AUXILIAR" | "FACTURADOR"
 
 interface AuthUser {
   id: string
@@ -10,6 +10,7 @@ interface AuthUser {
   rol: Role
   programaId?: string | null
   territorioId?: string | null
+  territorioIds?: string[] | null
   documento?: string
 }
 
@@ -20,6 +21,7 @@ interface AuthContextType {
   isAdmin: boolean
   isSuperAdmin: boolean
   isProfesional: boolean
+  isFacturador: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -55,16 +57,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("salud-pereira-token")
   }, [])
 
-  const isSuperAdmin = user?.rol === "superadmin"
-  const isAdmin = user?.rol === "admin" || isSuperAdmin
-  const isProfesional = user?.rol === "profesional"
+  // Timeout de inactividad: 10 minutos (600000 ms)
+  useEffect(() => {
+    if (!user) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const resetTimeout = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        logout();
+        // Opcional: recargar para limpiar estado si es necesario
+        window.location.reload(); 
+      }, 600000);
+    };
+
+    const handleActivity = () => {
+      resetTimeout();
+    };
+
+    const events = ["mousedown", "mousemove", "keydown", "scroll", "touchstart"];
+
+    resetTimeout(); // iniciar al entrar
+
+    events.forEach(event => window.addEventListener(event, handleActivity));
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(event => window.removeEventListener(event, handleActivity));
+    };
+  }, [user, logout]);
+
+  const isSuperAdmin = user?.rol?.toLowerCase() === "superadmin"
+  const isAdmin = user?.rol?.toLowerCase() === "admin" || isSuperAdmin
+  const isProfesional = user?.rol?.toLowerCase() === "profesional"
+  const isFacturador = user?.rol?.toLowerCase() === "facturador"
 
   if (isInitializing) {
     return null // or a loading spinner
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAdmin, isSuperAdmin, isProfesional }}>
+    <AuthContext.Provider value={{ user, login, logout, isAdmin, isSuperAdmin, isProfesional, isFacturador }}>
       {children}
     </AuthContext.Provider>
   )

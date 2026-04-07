@@ -1,0 +1,14 @@
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "postgres", schema "public" at "aws-1-us-east-2.pooler.supabase.com:5432"
+
+Your database is now in sync with your Prisma schema. Done in 3.43s
+
+Running generate... (Use --skip-generate to skip the generators)
+[2K[1A[2K[GRunning generate... - Prisma Client
+[2K[1A[2K[GEPERM: operation not permitted, rename 
+'C:\Users\juant\OneDrive\Documentos\JuanF\Proyectos\proyecto-gestion-atenciones-
+main\node_modules\.prisma\client\query_engine-windows.dll.node.tmp16764' -> 
+'C:\Users\juant\OneDrive\Documentos\JuanF\Proyectos\proyecto-gestion-atenciones-
+main\node_modules\.prisma\client\query_engine-windows.dll.node'
+

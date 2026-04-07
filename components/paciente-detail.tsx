@@ -1,7 +1,9 @@
 "use client"
 
 import useSWR from "swr"
+import { useState } from "react"
 import { fetcher } from "@/lib/fetcher"
+import { FamiliogramaGlobalEditor } from "./familiograma-global-editor"
 import {
   X,
   User,
@@ -16,6 +18,7 @@ import {
 import { calcularEdad, calcularCursoVida } from "@/lib/constants"
 
 export function PacienteDetail({ pacienteId, onClose }: { pacienteId: string, onClose: () => void }) {
+  const [showFamiliograma, setShowFamiliograma] = useState(false)
   const { data: paciente, error } = useSWR(`/api/pacientes/${pacienteId}`, fetcher)
 
   if (error) {
@@ -72,7 +75,7 @@ export function PacienteDetail({ pacienteId, onClose }: { pacienteId: string, on
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <DataCard title="Nombre Completo" value={paciente.nombreCompleto} />
               <DataCard title="Tipo y documento" value={`${paciente.tipoDocumento} ${paciente.documento}`} />
-              <DataCard title="Sexo" value={paciente.genero} />
+              <DataCard title="Género" value={paciente.genero} />
               <DataCard title="Teléfono" value={paciente.telefono} />
               <DataCard title="Dirección" value={paciente.direccion} />
               <DataCard title="Fecha Nacimiento" value={paciente.fechaNacimiento ? new Date(paciente.fechaNacimiento).toLocaleDateString() : '-'} />
@@ -154,15 +157,29 @@ export function PacienteDetail({ pacienteId, onClose }: { pacienteId: string, on
           </section>
 
           {paciente.fichaId && (
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border pt-4">
               <span className="text-xs text-primary font-medium px-3 py-1 bg-primary/10 rounded-full">
-                📌 Identificado mediante Ficha APS ({paciente.fichaId.slice(0, 8)}...)
+                📌 Familia Identificada mediante Ficha APS (ID: {paciente.fichaId.slice(0, 8)}...)
               </span>
+              <button 
+                onClick={() => setShowFamiliograma(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#0a8c32] text-white text-sm font-bold rounded-lg hover:bg-[#086a25] transition-colors shadow-sm"
+              >
+                <Activity className="w-4 h-4" />
+                ABRIR EDITOR DE FAMILIOGRAMA
+              </button>
             </div>
           )}
 
         </div>
       </div>
+      
+      {showFamiliograma && paciente?.fichaId && (
+        <FamiliogramaGlobalEditor 
+          fichaId={paciente.fichaId} 
+          onClose={() => setShowFamiliograma(false)} 
+        />
+      )}
     </div>
   )
 }

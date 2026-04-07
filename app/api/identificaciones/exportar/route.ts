@@ -10,6 +10,8 @@ import {
 } from '@/lib/constants'
 
 // Helper para limpiar el texto y evitar que rompa el CSV
+import { verifyToken } from '@/lib/verify-token'
+
 const cleanCsv = (val: any) => {
   if (val === null || val === undefined) return '""'
   const str = String(val).replace(/"/g, '""').replace(/\n/g, ' ').replace(/\r/g, '')
@@ -33,17 +35,44 @@ const getLabels = (arr: any[], ids: any[]) => {
 
 export async function GET(request: Request) {
   try {
+    const auth = await verifyToken(request);
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const { searchParams } = new URL(request.url)
-    const role = searchParams.get('role')
-    const territorioId = searchParams.get('territorioId')
-    const userId = searchParams.get('userId')
+    // Usamos el rol autenticado directamente por seguridad
+    const role = auth.decoded?.rol?.toLowerCase() || ''
+    const userId = auth.decoded?.userId
+    const userInfo = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { programa: true }
+    });
+
+    const territorioId = userInfo?.territorioId || searchParams.get('territorioId')
+
+    let isEnfermeria = false;
+    if (role === 'profesional' && userInfo?.programa?.nombre) {
+       const progName = userInfo.programa.nombre.toLowerCase();
+       if (progName.includes('enfermer')) isEnfermeria = true;
+    }
+
+    const isSuperAdmin = role === 'superadmin'
+    const isAdmin = role === 'admin'
+    const isAuxiliar = role === 'auxiliar'
+
+    // Validación de permisos estricta
+    if (!isSuperAdmin && !isAdmin && !isAuxiliar && !isEnfermeria) {
+       return NextResponse.json({ error: "No tienes permiso para descargar identificaciones" }, { status: 403 });
+    }
 
     let whereClause: any = {}
 
-    if (role === 'auxiliar') {
+    if (isAuxiliar) {
+      // Las que tengan relacionadas y hayan hecho en ese territorio
       if (territorioId) whereClause.territorioId = territorioId
       if (userId) whereClause.encuestadorId = userId
-    } else if (role === 'profesional') {
+    } else if (isEnfermeria) {
       if (territorioId) whereClause.territorioId = territorioId
     }
 
@@ -68,7 +97,7 @@ export async function GET(request: Request) {
       'dispResiduos', 'riesgoAccidente', 'fuenteEnergia', 'presenciaVectores', 'animales', 
       'cantAnimales', 'vacunacionMascotas',
       // FAMILIA
-      'tipoFamilia', 'numIntegrantes', 'apgar', 'ecomapa', 'cuidadorPrincipal', 'zarit', 'vulnerabilidades',
+      'tipoFamilia', 'numIntegrantes', 'apgar', 'apgar_P1', 'apgar_P2', 'apgar_P3', 'apgar_P4', 'apgar_P5', 'ecomapa', 'cuidadorPrincipal', 'zarit', 'vulnerabilidades',
       // INTEGRANTES
       'pacienteId', 'nombres', 'apellidos', 'tipoDoc', 'documento', 'fechaNacimiento', 'sexo',
       'generoIdentidad', 'parentesco', 'gestante', 'mesesGestacion', 'telefono', 'nivelEducativo',
@@ -129,6 +158,11 @@ export async function GET(request: Request) {
         cleanCsv(getLabel(TIPO_FAMILIA, f.tipoFamilia)),
         cleanCsv(f.numIntegrantes),
         cleanCsv(getLabel(APGAR_OPCIONES, f.apgar)),
+        cleanCsv(Array.isArray((f as any).apgarRespuestas) ? (f as any).apgarRespuestas[0] : ''),
+        cleanCsv(Array.isArray((f as any).apgarRespuestas) ? (f as any).apgarRespuestas[1] : ''),
+        cleanCsv(Array.isArray((f as any).apgarRespuestas) ? (f as any).apgarRespuestas[2] : ''),
+        cleanCsv(Array.isArray((f as any).apgarRespuestas) ? (f as any).apgarRespuestas[3] : ''),
+        cleanCsv(Array.isArray((f as any).apgarRespuestas) ? (f as any).apgarRespuestas[4] : ''),
         cleanCsv(getLabel(ECOMAPA_OPCIONES, f.ecomapa)),
         cleanCsv(f.cuidadorPrincipal ? 'SI' : 'NO'),
         cleanCsv(getLabel(ZARIT_OPCIONES, f.zarit)),

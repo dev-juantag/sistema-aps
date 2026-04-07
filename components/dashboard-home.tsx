@@ -23,6 +23,7 @@ import {
   Briefcase,
   Layers,
   Accessibility,
+  Clock,
 } from "lucide-react"
 import {
   BarChart,
@@ -35,15 +36,29 @@ import {
   ScatterChart,
   Scatter,
   ZAxis,
-  Legend
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts"
 
 import useSWR from "swr"
 import { fetcher } from "@/lib/fetcher"
 
 export function DashboardHome() {
-  const { user, isAdmin } = useAuth()
-  const today = new Date().toISOString().slice(0, 10)
+  const { user, isAdmin, isFacturador } = useAuth()
+  // Helper para convertir fechas a fecha local consistente
+  const getLocalDateString = (d: Date | string) => {
+    if (!d) return "";
+    const date = new Date(d);
+    // Remove the timezone offset shift to just use local JS Date mapping
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const today = getLocalDateString(new Date());
 
   // Helper para tiempo relativo
   const getRelativeTime = (isoString?: string, defaultDateStr?: string) => {
@@ -86,21 +101,25 @@ export function DashboardHome() {
   const programas = useMemo(() => Array.isArray(programasData) ? programasData : [], [programasData])
   
   const isEnfermeraJefe = useMemo(() => {
-    if (!user || user.rol !== 'profesional') return false;
+    if (!user || user.rol?.toLowerCase() !== 'profesional') return false;
     const prog = programas.find((p: any) => p.id === user.programaId);
     return prog ? prog.nombre.toLowerCase().includes('enfermer') : false;
   }, [user, programas]);
   
-  const shouldFetchIdData = user?.rol === "auxiliar" || isAdmin || isEnfermeraJefe;
+  const shouldFetchIdData = user?.rol?.toLowerCase() === "auxiliar" || isAdmin || isEnfermeraJefe || isFacturador;
+
+  const tIds = (isFacturador && user?.territorioIds?.length) 
+    ? user.territorioIds.join(',') 
+    : (user?.territorioId || "")
 
   const { data: identificacionesData, error: errId } = useSWR(
-    shouldFetchIdData ? `/api/identificaciones?role=${user?.rol}&territorioId=${(user?.rol === "auxiliar" || isEnfermeraJefe) ? (user?.territorioId || "") : ""}` : null,
+    shouldFetchIdData ? `/api/identificaciones?role=${user?.rol}&territorioId=${tIds}` : null,
     fetcher,
     swrOptions
   )
   const { data: terrsData, error: errTerr } = useSWR("/api/territorios", fetcher, swrOptions)
   const { data: idStats } = useSWR(
-    shouldFetchIdData ? `/api/identificaciones/stats?role=${user?.rol}&territorioId=${(user?.rol === "auxiliar" || isEnfermeraJefe) ? (user?.territorioId || "") : ""}` : null,
+    shouldFetchIdData ? `/api/identificaciones/stats?role=${user?.rol}&territorioId=${tIds}` : null,
     fetcher,
     swrOptions
   )
@@ -127,7 +146,7 @@ export function DashboardHome() {
     return atenciones.filter((a: any) => new Date(a.createdAtISO || (a.fecha + "T00:00:00")) >= new Date(currentStageStart));
   }, [atenciones, currentStageStart]);
 
-  const todayAtenciones = useMemo(() => filteredAtenciones.filter((a: any) => a.fecha.startsWith(today)), [filteredAtenciones, today])
+  const todayAtenciones = useMemo(() => filteredAtenciones.filter((a: any) => getLocalDateString(a.createdAtISO || a.fecha) === today), [filteredAtenciones, today])
   const misAtenciones = useMemo(() => filteredAtenciones.filter((a: any) => a.profesionalId === user?.id), [filteredAtenciones, user])
   
   const profesionalesActivos = useMemo(() => usuarios.filter((u: any) => u.rol === "profesional" && u.activo !== false).length, [usuarios])
@@ -147,15 +166,53 @@ export function DashboardHome() {
   const chartDataIdentificacionesRoles = useMemo(() => {
     const map: Record<string, number> = {};
     indentificaciones.forEach((idf: any) => {
-      // Priorizar el nombre del territorio, si no existe usar el código, si no "Sin asignar"
       const terrName = idf.territorio || idf.territorioCodigo || "Sin asignar";
       map[terrName] = (map[terrName] || 0) + 1;
     });
     return Object.keys(map).map(terr => ({
       nombre: terr,
       identificaciones: map[terr]
-    })).sort((a,b) => b.identificaciones - a.identificaciones);
+    })).sort((a: any, b: any) => b.identificaciones - a.identificaciones);
   }, [indentificaciones]);
+
+  const chartDataFacturacion = useMemo(() => {
+    const map: Record<string, number> = {
+      "PENDIENTE": 0,
+      "FACTURADA": 0,
+      "DEVUELTA": 0,
+      "GLOSADA": 0,
+      "EVOLUCIONADA_SAFIX": 0
+    };
+    filteredAtenciones.forEach((a: any) => {
+      if (map[a.estadoFacturacion] !== undefined) {
+        map[a.estadoFacturacion]++;
+      }
+    });
+
+    const labels: Record<string, string> = {
+      "PENDIENTE": "Pendientes",
+      "FACTURADA": "Facturadas",
+      "DEVUELTA": "Devueltas",
+      "GLOSADA": "Glosadas",
+      "EVOLUCIONADA_SAFIX": "SAFIX"
+    }
+
+    return Object.keys(map).map(key => ({
+      name: labels[key] || key,
+      value: map[key]
+    })).filter(d => d.value > 0);
+  }, [filteredAtenciones]);
+
+  const recentPendingAtenciones = useMemo(() => {
+    return filteredAtenciones
+      .filter((a: any) => a.estadoFacturacion === "PENDIENTE")
+      .sort((a: any, b: any) => {
+        const dateA = new Date(a.createdAtISO || a.fecha).getTime();
+        const dateB = new Date(b.createdAtISO || b.fecha).getTime();
+        return dateB - dateA;
+      })
+      .slice(0, 6)
+  }, [filteredAtenciones]);
 
   // Lógica Auxiliar: Identificaciones del territorio vs personales
   const countsId = useMemo(() => {
@@ -163,8 +220,8 @@ export function DashboardHome() {
     return {
       totalTerritorio: list.length,
       misId: list.filter((f: any) => f.encuestador?.documento === user?.documento).length,
-      hoyTerritorio: list.filter((f: any) => f.fechaDiligenciamiento.startsWith(today)).length,
-      misHoy: list.filter((f: any) => f.encuestador?.documento === user?.documento && f.fechaDiligenciamiento.startsWith(today)).length,
+      hoyTerritorio: list.filter((f: any) => getLocalDateString(f.fechaDiligenciamiento) === today).length,
+      misHoy: list.filter((f: any) => f.encuestador?.documento === user?.documento && getLocalDateString(f.fechaDiligenciamiento) === today).length,
     }
   }, [indentificaciones, user, today])
 
@@ -275,6 +332,35 @@ export function DashboardHome() {
       ]
     }
 
+    if (isFacturador) {
+      return [
+        {
+          label: "Pendientes",
+          value: filteredAtenciones.filter((a: any) => a.estadoFacturacion === "PENDIENTE").length,
+          icon: <Clock className="h-5 w-5" />,
+          color: "bg-yellow-100 text-yellow-600",
+        },
+        {
+          label: "Facturadas",
+          value: filteredAtenciones.filter((a: any) => a.estadoFacturacion === "FACTURADA").length,
+          icon: <CheckCircle2 className="h-5 w-5" />,
+          color: "bg-purple-100 text-purple-600",
+        },
+        {
+          label: "Devueltas/Glosadas",
+          value: filteredAtenciones.filter((a: any) => ["DEVUELTA", "GLOSADA"].includes(a.estadoFacturacion)).length,
+          icon: <AlertTriangle className="h-5 w-5" />,
+          color: "bg-red-100 text-red-600",
+        },
+        {
+          label: "Sincronizadas SAFIX",
+          value: filteredAtenciones.filter((a: any) => a.estadoFacturacion === "EVOLUCIONADA_SAFIX").length,
+          icon: <Activity className="h-5 w-5" />,
+          color: "bg-green-100 text-green-600",
+        }
+      ]
+    }
+
     if (isAdmin) {
       return [
         {
@@ -355,6 +441,8 @@ export function DashboardHome() {
               ? "Métricas y datos estadísticos focalizados en tu territorio asignado"
               : isAdmin
               ? "Resumen consolidado global del sistema APS"
+              : isFacturador
+              ? "Gestión y monitoreo de facturación de atenciones"
               : "Resumen institucional y personal de gestión de atenciones"}
           </p>
         </div>
@@ -556,12 +644,35 @@ export function DashboardHome() {
           <div className="mb-4 flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold text-foreground">
-              {user?.rol === "auxiliar" || isEnfermeraJefe ? "Estado de Identificaciones del Territorio" : "Todas las Atenciones por Programa"}
+              {isFacturador ? "Distribución por Estado de Facturación" : user?.rol === "auxiliar" || isEnfermeraJefe ? "Estado de Identificaciones del Territorio" : "Todas las Atenciones por Programa"}
             </h2>
           </div>
-          {(user?.rol === "auxiliar" || isEnfermeraJefe ? chartDataIdAuxiliar : chartDataAtenciones).length === 0 ? (
+          {(isFacturador ? chartDataFacturacion : (user?.rol === "auxiliar" || isEnfermeraJefe ? chartDataIdAuxiliar : chartDataAtenciones)).length === 0 ? (
             <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
               No hay datos para mostrar.
+            </div>
+          ) : isFacturador ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartDataFacturacion}
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {chartDataFacturacion.map((entry, index) => {
+                      const COLORS = ["#f59e0b", "#9333ea", "#ef4444", "#f97316", "#10b981"];
+                      return <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />;
+                    })}
+                  </Pie>
+                  <Tooltip />
+                  <Legend verticalAlign="bottom" height={36}/>
+                </PieChart>
+              </ResponsiveContainer>
             </div>
           ) : (
             <div className="h-64">
@@ -634,20 +745,20 @@ export function DashboardHome() {
         ) : (
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
-              {user?.rol === "auxiliar" || isEnfermeraJefe ? <Database className="h-5 w-5 text-primary" /> : <ClipboardList className="h-5 w-5 text-primary" />}
+              {isFacturador ? <Clock className="h-5 w-5 text-primary" /> : (user?.rol === "auxiliar" || isEnfermeraJefe ? <Database className="h-5 w-5 text-primary" /> : <ClipboardList className="h-5 w-5 text-primary" />)}
               <h2 className="text-lg font-semibold text-foreground">
-                {user?.rol === "auxiliar" || isEnfermeraJefe
+                {isFacturador ? "Atenciones Pendientes por Facturar" : (user?.rol === "auxiliar" || isEnfermeraJefe
                   ? "Últimas Identificaciones del Territorio"
-                  : `Atenciones recientes del programa`}
+                  : `Atenciones recientes del programa`)}
               </h2>
             </div>
-            {(user?.rol === "auxiliar" || isEnfermeraJefe ? recentIdentificaciones : recentAtenciones).length === 0 ? (
+            {(isFacturador ? recentPendingAtenciones : (user?.rol === "auxiliar" || isEnfermeraJefe ? recentIdentificaciones : recentAtenciones)).length === 0 ? (
               <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                No hay {user?.rol === "auxiliar" || isEnfermeraJefe ? "identificaciones" : "atenciones"} registradas.
+                No hay {isFacturador ? "atenciones pendientes" : (user?.rol === "auxiliar" || isEnfermeraJefe ? "identificaciones" : "atenciones")} registradas.
               </div>
             ) : (
               <ul className="flex flex-col gap-3">
-                {(user?.rol === "auxiliar" || isEnfermeraJefe ? recentIdentificaciones : recentAtenciones).map((a: any) => (
+                {(isFacturador ? recentPendingAtenciones : (user?.rol === "auxiliar" || isEnfermeraJefe ? recentIdentificaciones : recentAtenciones)).map((a: any) => (
                   <li
                     key={a.id}
                     className="flex items-center gap-4 rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors"
@@ -667,7 +778,9 @@ export function DashboardHome() {
                       <p className="text-xs text-muted-foreground">
                         {(user?.rol === "auxiliar" || isEnfermeraJefe)
                           ? `En: ${a.microterritorio} — ${getRelativeTime(a.fechaDiligenciamiento)}`
-                          : `Por: ${a.profesionalNombre}`
+                          : (isFacturador 
+                              ? `${getProgramaById(a.programaId)?.nombre || "Sin programa"} — ${getRelativeTime(a.createdAtISO, a.fecha)}`
+                              : `Por: ${a.profesionalNombre}`)
                         }
                       </p>
                       {((user?.rol === "auxiliar" || isEnfermeraJefe) && a.encuestador) && (
@@ -754,7 +867,7 @@ export function DashboardHome() {
       )}
 
       {/* Top 10 Profesionales */}
-      {user?.rol !== "auxiliar" && (
+      {user?.rol !== "auxiliar" && !isFacturador && (
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm mx-auto w-full lg:w-3/4 xl:w-2/3">
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2">

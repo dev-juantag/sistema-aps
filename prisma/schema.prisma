@@ -19,7 +19,8 @@ model Territorio {
   contratos    Contrato[]
   derivaciones Derivacion[]
   fichas       FichaHogar[]
-  usuarios     User[]
+  usuarios     User[]       @relation("UserSingleTerritorio")
+  facturadores User[]       @relation("FacturadorTerritorios")
 }
 
 model Programa {
@@ -53,8 +54,9 @@ model User {
   derivacionesRecibidas Derivacion[]              @relation("ProfesionalDerivacion")
   auditoriasContrato    EstadoContratoHistorial[]
   fichasCreadas         FichaHogar[]
+  territoriosAsignados  Territorio[]              @relation("FacturadorTerritorios")
   programa              Programa?                 @relation(fields: [programaId], references: [id])
-  territorio            Territorio?               @relation(fields: [territorioId], references: [id])
+  territorio            Territorio?               @relation("UserSingleTerritorio", fields: [territorioId], references: [id])
 }
 
 model Contrato {
@@ -125,6 +127,7 @@ model FichaHogar {
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @default(now()) @updatedAt
   apgar                 Int?
+  apgarRespuestas       Int[]
   cantAnimales          Int?
   centroPoblado         String?
   cuidadorPrincipal     Boolean?
@@ -239,12 +242,13 @@ model Atencion {
   programaId        String
   nota              String
   createdAt         DateTime          @default(now())
-  estadoFacturacion EstadoFacturacion @default(PENDIENTE)
-  territorioId      String?
-  updatedAt         DateTime          @default(now()) @updatedAt
-  paciente          Paciente          @relation(fields: [pacienteId], references: [id])
-  profesional       User              @relation(fields: [profesionalId], references: [id])
-  programa          Programa          @relation(fields: [programaId], references: [id])
+  estadoFacturacion     EstadoFacturacion @default(PENDIENTE)
+  observacionFacturacion String?
+  territorioId          String?
+  updatedAt             DateTime          @default(now()) @updatedAt
+  paciente              Paciente          @relation(fields: [pacienteId], references: [id])
+  profesional           User              @relation(fields: [profesionalId], references: [id])
+  programa              Programa          @relation(fields: [programaId], references: [id])
   territorio        Territorio?       @relation(fields: [territorioId], references: [id])
   derivacion        Derivacion?       @relation("DerivacionAtencion")
 }
@@ -286,7 +290,9 @@ enum ContratoEstado {
 enum EstadoFacturacion {
   NO_FACTURABLE
   PENDIENTE
+  DEVUELTA
   FACTURADA
+  EVOLUCIONADA_SAFIX
   GLOSADA
   PAGADA
 }

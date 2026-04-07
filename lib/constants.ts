@@ -380,6 +380,11 @@ export const REMISIONES_APS = [
   { id: 'psicologia', label: 'Psicología' },
   { id: 'odontologia', label: 'Odontología' },
   { id: 'medicina', label: 'Medicina General' },
+  { id: 'enfermeria', label: 'Enfermería' },
+  { id: 'trabajo_social', label: 'Trabajo Social' },
+  { id: 'fisioterapia', label: 'Fisioterapia' },
+  { id: 'terapia_respiratoria', label: 'Terapia Respiratoria' },
+  { id: 'nutricion', label: 'Nutrición' }
 ]
 
 export const DIAGNOSTICO_NUTRICIONAL = [

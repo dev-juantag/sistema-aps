@@ -8,15 +8,30 @@ import { verifyToken } from "@/lib/verify-token";
 
 export async function GET(req: Request) {
   try {
-    const auth = verifyToken(req);
+    const auth = await verifyToken(req);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
     const { searchParams } = new URL(req.url);
     const requestedProfesionalId = searchParams.get('profesionalId');
-    const userRole = auth.decoded?.rol;
+    const userRole = auth.decoded?.rol?.toUpperCase();
     const userId = auth.decoded?.userId;
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { 
+        programa: true,
+        territoriosAsignados: true 
+      }
+    });
+
+    let isEnfermeria = false;
+    if (currentUser?.rol === 'PROFESIONAL' && currentUser?.programa?.nombre) {
+      if (currentUser.programa.nombre.toLowerCase().includes('enfermer')) {
+         isEnfermeria = true;
+      }
+    }
 
     let whereClause: any = {};
 
@@ -27,11 +42,35 @@ export async function GET(req: Request) {
         whereClause.createdAt = { gte: settings.currentStageStart };
       }
       
-      // If user is precisely PROFESIONAL, force scope to themselves
+      // If user is precisely PROFESIONAL, force scope to themselves or their territory if isEnfermeria
       if (userRole === "PROFESIONAL") {
-        whereClause.profesionalId = userId;
+        if (isEnfermeria && currentUser?.territorioId) {
+          whereClause.profesional = {
+            territorioId: currentUser.territorioId
+          };
+        } else {
+          whereClause.profesionalId = userId;
+        }
       }
-    } else {
+      if (userRole === "FACTURADOR") {
+        const assignedTIds = currentUser?.territoriosAsignados?.map((t: any) => t.id) || [];
+        
+        if (assignedTIds.length > 0) {
+          whereClause.OR = [
+            { territorioId: { in: assignedTIds } },
+            { profesional: { territorioId: { in: assignedTIds } } }
+          ];
+        } else if (currentUser?.territorioId) {
+          whereClause.OR = [
+            { territorioId: currentUser.territorioId },
+            { profesional: { territorioId: currentUser.territorioId } }
+          ];
+        } else {
+          // Si es facturador pero no tiene territorios asignados, mostrar nada (seguridad)
+          whereClause.territorioId = "NONE";
+        }
+      }
+
       // Admins can filter by specific profesional if they want
       if (requestedProfesionalId) {
         whereClause.profesionalId = requestedProfesionalId;
@@ -69,6 +108,7 @@ export async function GET(req: Request) {
       fecha: a.createdAt.toISOString().split('T')[0],
       createdAtISO: a.createdAt.toISOString(),
       estadoFacturacion: a.estadoFacturacion,
+      observacionFacturacion: a.observacionFacturacion || "",
     }));
 
     return NextResponse.json(formattedAtenciones);
@@ -84,7 +124,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const auth = verifyToken(req);
+    const auth = await verifyToken(req);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -109,6 +149,11 @@ export async function POST(req: Request) {
     const finalProfesionalId = auth.decoded?.rol === "SUPERADMIN" || auth.decoded?.rol === "ADMIN" 
       ? (profesionalId || authenticatedUserId) 
       : authenticatedUserId;
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: finalProfesionalId },
+      select: { territorioId: true }
+    });
 
     let nombres = "";
     let apellidos = "";
@@ -168,6 +213,7 @@ export async function POST(req: Request) {
         profesionalId: finalProfesionalId,
         programaId,
         nota,
+        territorioId: currentUser?.territorioId,
       },
       include: {
         paciente: true,

@@ -144,11 +144,25 @@
 }
 
 @media print {
+  @page {
+    margin: 1cm;
+    margin-bottom: 0.5cm;
+  }
+  
   /* Al imprimir, forzamos que todos los contenedores con overflow se expandan infinitamente */
   html, body, #__next, main, div[class*="overflow-hidden"], div[class*="overflow-y-auto"], div[class*="max-h-"], div[class*="h-screen"], div[class*="inset-0"] {
     height: auto !important;
+    min-height: auto !important;
     max-height: none !important;
     overflow: visible !important;
     position: static !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* Ocultar elementos sobrantes del body que React o Dialogs de UI puedan estar inyectando al final */
+  body::after, html::after {
+    display: none !important;
   }
 }
+

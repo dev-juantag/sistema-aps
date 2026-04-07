@@ -2,17 +2,22 @@ import { ArrowLeft, Printer, MapPin, Info, Home, Users, Activity, Stethoscope, F
 import { ESTADO_VISITA, APGAR_OPCIONES, calcularEdad } from '@/lib/constants'
 import FamiliogramaViewer from './FamiliogramaViewer'
 
+import { useState } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import useSWR from "swr"
 import { fetcher } from "@/lib/fetcher"
+import { FamiliogramaGlobalEditor } from '../familiograma-global-editor'
+import FamiliogramaStaticViewer from './FamiliogramaStaticViewer'
 
 export default function ResumenFicha({ 
-  ficha, onClose, onStartNew, onEnableUpdate, onGoToEdit 
+  ficha, onClose, onStartNew, onEnableUpdate, onGoToEdit, onRefreshFicha 
 }: { 
   ficha: any, onClose: () => void, onStartNew?: (micro: string) => void,
   onEnableUpdate?: (id: string, current: boolean) => void,
-  onGoToEdit?: () => void
+  onGoToEdit?: () => void,
+  onRefreshFicha?: () => void
 }) {
+  const [showFamiliograma, setShowFamiliograma] = useState(false)
   const { user, isSuperAdmin, isAdmin } = useAuth()
   const { data: rawProgramas } = useSWR("/api/programas", fetcher)
   
@@ -23,6 +28,21 @@ export default function ResumenFicha({
     const prog = Array.isArray(rawProgramas) ? rawProgramas.find((p: any) => String(p.id) === String(user.programaId)) : null;
     return prog ? prog.nombre.toLowerCase().includes('enfermer') : false;
   }
+
+  const isPsicologiaSocial = () => {
+    if (!user || user.rol !== 'profesional') return false;
+    // Buscamos en programas si existe o podemos inferir desde otra parte
+    const prog = Array.isArray(rawProgramas) ? rawProgramas.find((p: any) => String(p.id) === String(user.programaId)) : null;
+    if (prog) {
+      const n = prog.nombre.toLowerCase();
+      return n.includes('psicolog') || n.includes('trabaj') || n.includes('desarrollo familiar');
+    }
+    return false;
+  }
+
+  // Prevenir parpadeo si los programas aún están cargando y sabemos que es profesional
+  const isLoadingProgramas = !rawProgramas && user?.rol === 'profesional';
+  const canManageFamiliograma = isSuperAdmin || isAdmin || isEnfermeria() || isPsicologiaSocial() || (isLoadingProgramas && user?.rol === 'profesional');
 
   const fechaText = new Date(ficha.fechaDiligenciamiento).toLocaleDateString('es-CO', {
     day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: 'numeric'
@@ -55,7 +75,7 @@ export default function ResumenFicha({
   }
 
   return (
-    <div className="w-full flex flex-col font-sans bg-gray-50/50 min-h-[70vh]">
+    <div className="w-full flex flex-col bg-gray-50/50 min-h-[70vh]">
       
       {/* Header Modal */}
       <div className="bg-[#081e69] text-white p-6 pb-8 rounded-t-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 sticky top-0 z-10 shadow-md">
@@ -76,13 +96,15 @@ export default function ResumenFicha({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white text-[#081e69] rounded-full font-bold text-sm shadow hover:bg-blue-50 transition-colors"
-          >
-            <Printer className="w-4 h-4" /> Imprimir Identificación
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {(user?.rol === 'auxiliar' || isSuperAdmin || isAdmin || isEnfermeria()) && (
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-5 py-2.5 bg-white text-[#081e69] rounded-full font-bold text-sm shadow hover:bg-blue-50 transition-colors"
+            >
+              <Printer className="w-4 h-4" /> Imprimir Identificación
+            </button>
+          )}
           <div className={`px-4 py-1.5 rounded-full font-black text-xs tracking-widest border ${
             ficha.estadoVisita === '1' ? 'bg-teal-100 text-teal-800 border-teal-200' :
             ficha.estadoVisita === '2' ? 'bg-orange-100 text-orange-800 border-orange-200' :
@@ -255,7 +277,7 @@ export default function ResumenFicha({
             
             <div>
               <p className="text-[10px] font-black text-gray-400 tracking-wider uppercase mb-1">APGAR Familiar</p>
-              <p className="font-bold text-gray-800 text-xl">{getLabel(APGAR_OPCIONES, ficha.apgar) ? `${ficha.apgar} pts` : '-'}</p>
+              <p className="font-bold text-gray-800 text-sm mt-1 leading-tight">{getLabel(APGAR_OPCIONES, ficha.apgar) || '-'}</p>
             </div>
             <div>
               <p className="text-[10px] font-black text-gray-400 tracking-wider uppercase mb-1">Vectores/Plagas</p>
@@ -264,6 +286,10 @@ export default function ResumenFicha({
             <div>
               <p className="text-[10px] font-black text-gray-400 tracking-wider uppercase mb-1">Animales</p>
               <p className="font-bold text-gray-800 text-xl">{ficha.cantAnimales || 0}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-gray-400 tracking-wider uppercase mb-1">Total Integrantes</p>
+              <p className="font-bold text-gray-800 text-xl">{ficha.numIntegrantes || ficha.pacientes?.length || 0}</p>
             </div>
           </div>
         </div>
@@ -310,7 +336,7 @@ export default function ResumenFicha({
 
                       <div className="flex items-center gap-3 sm:gap-6 self-start sm:self-auto border-t sm:border-0 border-gray-100 pt-3 sm:pt-0">
                         <div>
-                          <p className="text-[9px] font-black text-gray-400 tracking-widest uppercase text-left sm:text-right">Sexo</p>
+                          <p className="text-[9px] font-black text-gray-400 tracking-widest uppercase text-left sm:text-right">Género</p>
                           <p className="font-bold text-sm text-gray-800 capitalize leading-tight">{pac.sexo?.toLowerCase() || 'N/A'}</p>
                         </div>
                         <div className="bg-white border text-center border-gray-200 rounded-lg px-4 py-1.5 shadow-sm">
@@ -356,25 +382,56 @@ export default function ResumenFicha({
         </div>
         )}
 
-        {/* FAMILIOGRAMA AUTO-GENERADO */}
-        {ficha.estadoVisita === '1' && ficha.familiogramaCodigo && (
+        {/* FAMILIOGRAMA AUTO-GENERADO o PERSONALIZADO */}
+        {ficha.estadoVisita === '1' && canManageFamiliograma && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
-              <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Network className="w-5 h-5" />
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Network className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-gray-800">Familiograma</h2>
+                  <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Representación Familiar</p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-bold text-gray-800">Familiograma Inteligente</h2>
-                <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Generado Automáticamente</p>
-              </div>
+              <button 
+                onClick={() => setShowFamiliograma(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#0a8c32] text-white text-sm font-bold rounded-lg hover:bg-[#086a25] transition-colors shadow-sm"
+              >
+                <Activity className="w-4 h-4" />
+                ABRIR EDITOR LITERAL / CANVAS
+              </button>
             </div>
             
-            <FamiliogramaViewer code={ficha.familiogramaCodigo} />
+            {ficha.familiogramaCodigo && !String(ficha.familiogramaCodigo).startsWith('{') ? (
+               <FamiliogramaViewer code={ficha.familiogramaCodigo} />
+            ) : ficha.familiogramaCodigo && String(ficha.familiogramaCodigo).startsWith('{') ? (
+               <div className="mt-4 border rounded-xl overflow-hidden print:overflow-visible bg-white shadow-sm print:shadow-none print:border-gray-300">
+                  <FamiliogramaStaticViewer jsonString={ficha.familiogramaCodigo} />
+               </div>
+            ) : (
+               <div className="flex items-center justify-center p-12 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                 <p className="text-gray-500 font-medium text-center">
+                   El sistema utiliza el Lienzo Profesional para esta familia pero aún no ha sido diseñado o guardado.<br/>
+                   <span className="text-xs mt-1 block">Oprime el botón superior verde para abrir el editor e interactuar.</span>
+                 </p>
+               </div>
+            )}
           </div>
         )}
 
       </div>
 
+      {showFamiliograma && ficha?.id && (
+        <FamiliogramaGlobalEditor 
+          fichaId={ficha.id} 
+          onClose={() => {
+            setShowFamiliograma(false)
+            if (onRefreshFicha) onRefreshFicha()
+          }} 
+        />
+      )}
     </div>
   )
 }

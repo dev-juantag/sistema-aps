@@ -4,7 +4,7 @@ import { verifyToken } from "@/lib/verify-token";
 
 export async function GET(req: Request) {
   try {
-    const auth = verifyToken(req);
+    const auth = await verifyToken(req);
     if (auth.error) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

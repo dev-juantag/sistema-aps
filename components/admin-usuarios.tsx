@@ -113,7 +113,13 @@ export function AdminUsuarios() {
 
     if (!confirm(`¿Está seguro de eliminar al usuario ${u.nombre}?`)) return
 
-    const res = await fetch(`/api/users/${u.id}`, { method: "DELETE" })
+    const token = localStorage.getItem("salud-pereira-token");
+    const res = await fetch(`/api/users/${u.id}`, { 
+      method: "DELETE",
+      headers: {
+        "Authorization": token ? `Bearer ${token}` : ""
+      }
+    })
     if (!res.ok) {
       const errorData = await res.json()
       alert(errorData.error || "Error al eliminar usuario")
@@ -134,9 +140,13 @@ export function AdminUsuarios() {
     const accion = u.activo === false ? "habilitar" : "deshabilitar";
     if (!confirm(`¿Seguro que quieres ${accion} a este usuario?`)) return;
 
+    const token = localStorage.getItem("salud-pereira-token");
     const res = await fetch(`/api/users/${u.id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": token ? `Bearer ${token}` : ""
+      },
       body: JSON.stringify({ activo: u.activo === false ? true : false }),
     });
 
@@ -153,17 +163,24 @@ export function AdminUsuarios() {
   }
 
   const handleSave = async (data: any) => {
+    const token = localStorage.getItem("salud-pereira-token");
     let res;
     if (editingUser) {
       res = await fetch(`/api/users/${editingUser.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": token ? `Bearer ${token}` : ""
+        },
         body: JSON.stringify(data),
       })
     } else {
       res = await fetch("/api/users", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": token ? `Bearer ${token}` : ""
+        },
         body: JSON.stringify(data),
       })
     }
@@ -440,9 +457,13 @@ function ImportUsersModal({ programas, territorios, onClose, onSuccess }: any) {
        }
 
        try {
+         const token = localStorage.getItem("salud-pereira-token");
          const res = await fetch("/api/users", {
            method: "POST",
-           headers: { "Content-Type": "application/json" },
+           headers: { 
+             "Content-Type": "application/json",
+             "Authorization": token ? `Bearer ${token}` : ""
+           },
            body: JSON.stringify({ nombre, apellidos, documento, email, telefono, password, rol, programaId, territorioId })
          })
          if (!res.ok) {
@@ -547,6 +568,7 @@ function UserFormModal({ user, programas, territorios, onClose, onSave }: any) {
   const [rol, setRol] = useState<Role>(user?.rol || defaultRol)
   const [programaId, setProgramaId] = useState(user?.programaId || "")
   const [territorioId, setTerritorioId] = useState(user?.territorioId || "")
+  const [territorioIds, setTerritorioIds] = useState<string[]>(user?.territorioIds || [])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [sendingRecovery, setSendingRecovery] = useState(false)
 
@@ -554,9 +576,13 @@ function UserFormModal({ user, programas, territorios, onClose, onSave }: any) {
     if (!email) return;
     setSendingRecovery(true);
     try {
+      const token = localStorage.getItem("salud-pereira-token");
       const res = await fetch("/api/auth/recuperar", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": token ? `Bearer ${token}` : ""
+        },
         body: JSON.stringify({ email, isAdminRequest: true }),
       });
       const data = await res.json();
@@ -590,6 +616,7 @@ function UserFormModal({ user, programas, territorios, onClose, onSave }: any) {
       rol,
       programaId: (rol === "profesional") ? programaId : null,
       territorioId: (rol === "auxiliar" || rol === "profesional") ? territorioId : null,
+      territorioIds: (rol === "facturador") ? territorioIds : [],
     })
     setIsSubmitting(false)
   }
@@ -742,7 +769,7 @@ function UserFormModal({ user, programas, territorios, onClose, onSave }: any) {
             </select>
           </div>
 
-          {/* Si es Auxiliar o Profesional, requiere territorio */}
+          {/* Si es Auxiliar o Profesional, requiere un único territorio */}
           {(rol === "auxiliar" || rol === "profesional") && (
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-semibold text-foreground">Territorio asignado</label>
@@ -759,6 +786,35 @@ function UserFormModal({ user, programas, territorios, onClose, onSave }: any) {
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Si es Facturador, puede tener múltiples territorios */}
+          {rol === "facturador" && (
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-semibold text-foreground">Territorios asignados (Multiselección)</label>
+              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-3 border border-border rounded-xl bg-muted/20">
+                {territorios.map((t: Territorio) => (
+                  <label key={t.id} className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted p-1 rounded transition-colors">
+                    <input 
+                      type="checkbox"
+                      checked={territorioIds.includes(t.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setTerritorioIds([...territorioIds, t.id]);
+                        } else {
+                          setTerritorioIds(territorioIds.filter(id => id !== t.id));
+                        }
+                      }}
+                      className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                    />
+                    <span className="truncate">{t.codigo} - {t.nombre}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Seleccione todos los territorios que el facturador podrá gestionar.
+              </p>
             </div>
           )}
 

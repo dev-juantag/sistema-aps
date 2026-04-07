@@ -41,3 +41,41 @@ export async function DELETE(
     )
   }
 }
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    
+    if (!id) {
+      return NextResponse.json({ error: "ID no proporcionado" }, { status: 400 });
+    }
+
+    const { estadoFacturacion, observacionFacturacion } = body;
+
+    const dataToUpdate: any = {};
+    if (estadoFacturacion !== undefined) dataToUpdate.estadoFacturacion = estadoFacturacion;
+    if (observacionFacturacion !== undefined) dataToUpdate.observacionFacturacion = observacionFacturacion;
+
+    if (Object.keys(dataToUpdate).length === 0) {
+      return NextResponse.json({ error: "No hay datos para actualizar" }, { status: 400 });
+    }
+
+    const updated = await prisma.atencion.update({
+      where: { id },
+      data: dataToUpdate,
+    });
+
+    return NextResponse.json(updated);
+
+  } catch (error) {
+    console.error("PATCH ATENCION ERROR:", error);
+    return NextResponse.json(
+      { error: "Error al actualizar atención" },
+      { status: 500 }
+    );
+  }
+}

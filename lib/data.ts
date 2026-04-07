@@ -1,4 +1,4 @@
-export type Role = "admin" | "profesional"
+export type Role = "admin" | "profesional" | "superadmin" | "auxiliar" | "facturador" | "ADMIN" | "PROFESIONAL" | "SUPERADMIN" | "AUXILIAR" | "FACTURADOR"
 
 export interface User {
   id: string
@@ -47,6 +47,8 @@ export interface Atencion {
   profesionalNombre: string
   fecha: string
   createdAtISO?: string
+  estadoFacturacion?: string
+  observacionFacturacion?: string
 }
 
 export const PROGRAMAS: Programa[] = [

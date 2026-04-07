@@ -15,7 +15,8 @@ export async function POST(req: Request) {
     const { email, password } = await req.json()
 
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
+      include: { territoriosAsignados: true }
     })
 
     if (!user) {
@@ -84,6 +85,7 @@ export async function POST(req: Request) {
         rol: user.rol.toLowerCase(),
         programaId: user.programaId,
         territorioId: user.territorioId,
+        territorioIds: (user as any).territoriosAsignados?.map((t: any) => t.id) || [],
         documento: user.documento
       }
     })

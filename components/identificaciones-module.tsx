@@ -16,10 +16,26 @@ export function IdentificacionesModule() {
   const { user, isSuperAdmin, isAdmin } = useAuth()
   const isAuxiliar = user?.rol === "auxiliar"
 
-  // Obtenemos los datos desde el nuevo endpoint pasándole los parámetros según los permisos
-  const apiUrl = user ? `/api/identificaciones?role=${user.rol}&territorioId=${user.territorioId || ''}` : null
+  const [qBusqueda, setQBusqueda] = useState("")
+  const [activeSearch, setActiveSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const limit = 50
+
+  const apiUrl = user ? `/api/identificaciones?role=${user.rol}&territorioId=${user.territorioId || ''}&page=${page}&limit=${limit}${activeSearch ? `&search=${encodeURIComponent(activeSearch)}` : ''}` : null
   const { data: rawFichas, isLoading: loading, mutate: mutateFichas } = useSWR<any>(apiUrl, fetcher)
-  const fichasData: any[] = Array.isArray(rawFichas) ? rawFichas : []
+  
+  const { data: rawProgramas } = useSWR<any>("/api/programas", fetcher)
+  const programas: any[] = Array.isArray(rawProgramas) ? rawProgramas : []
+
+  const isEnfermeria = () => {
+    if (!user || user.rol !== 'profesional' || !user.programaId) return false;
+    const prog = programas.find((p: any) => String(p.id) === String(user.programaId));
+    return prog ? prog.nombre.toLowerCase().includes('enfermer') : false;
+  }
+
+  
+  const fichasData: any[] = rawFichas?.fichas || (Array.isArray(rawFichas) ? rawFichas : [])
+  const pagination = rawFichas?.pagination || { page: 1, totalPages: 1, totalCount: fichasData.length }
 
   const [exporting, setExporting] = useState(false)
   
@@ -39,28 +55,30 @@ export function IdentificacionesModule() {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importStatus, setImportStatus] = useState<{success?: string, error?: string, errors?: string[]} | null>(null)
 
-  // Filtros visuales
+  // Filtros visuales adicionales
   const [qHogar, setQHogar] = useState("")
   const [qEstado, setQEstado] = useState("")
-  const [qBusqueda, setQBusqueda] = useState("")
+
+  const handleSearch = () => {
+    setActiveSearch(qBusqueda)
+    setPage(1)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') handleSearch()
+  }
 
   const filteredFichas = useMemo(() => {
     return fichasData.filter((f) => {
       const matchEstado = !qEstado || f.estadoVisita === qEstado
-      
-      const searchElements = [
-        f.encuestador?.documento,
-        f.encuestador?.nombre,
-        f.direccion,
-        f.microterritorio,
-        ...(f.integrantesDocs || [])
-      ].filter(Boolean).map(String).join(' ').toLowerCase()
-
-      const matchBusqueda = !qBusqueda || searchElements.includes(qBusqueda.toLowerCase())
-
-      return matchEstado && matchBusqueda
+      return matchEstado
     })
-  }, [fichasData, qEstado, qBusqueda])
+  }, [fichasData, qEstado])
+
+  // Reset page to 1 if user types in search so they don't get stuck on empty pages
+  // (Though note that filtering only applies to the current fetched page)
+  // To avoid circular or frequent updates, we don't automatically reset page here, 
+  // but it's something to consider for future advanced search.
 
   const handleDeleteFicha = async (id: string, consecutivo: number) => {
     if (!confirm(`PELIGRO: ¿Estás totalmente seguro de eliminar todo el registro de la Ficha #${consecutivo}? Esto borrará también a la familia e integrantes de forma irreversible.`)) return
@@ -99,7 +117,12 @@ export function IdentificacionesModule() {
     try {
       const exportUrl = user ? `/api/identificaciones/exportar?role=${user.rol}&territorioId=${user.territorioId || ''}&userId=${user.id || ''}` : '/api/identificaciones/exportar'
       
-      const response = await fetch(exportUrl)
+      const token = localStorage.getItem("salud-pereira-token");
+      const response = await fetch(exportUrl, {
+        headers: {
+          "Authorization": token ? `Bearer ${token}` : ""
+        }
+      })
       if (!response.ok) throw new Error("Error al exportar los datos")
       
       const blob = await response.blob()
@@ -214,38 +237,42 @@ export function IdentificacionesModule() {
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
-          <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           {isSuperAdmin && (
              <button
                disabled={isImporting}
                onClick={() => setShowImportModal(true)}
-               className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
+               className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 w-full sm:w-auto"
              >
                <Upload className="h-4 w-4" />
                Importar CSV
              </button>
           )}
-          <button
-            disabled={exporting}
-            onClick={handleExport}
-            className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50"
-          >
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            {user?.rol === 'auxiliar' ? 'Descargar Mis Identificaciones' : 'Descargar Todo'}
-          </button>
+          {(isSuperAdmin || isAdmin || isAuxiliar || isEnfermeria()) && (
+            <button
+              disabled={exporting}
+              onClick={handleExport}
+              className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 w-full sm:w-auto text-center"
+            >
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              <span className="whitespace-nowrap sm:whitespace-normal">
+                {user?.rol === 'auxiliar' ? 'Descargar Excel' : 'Descargar Todo'}
+              </span>
+            </button>
+          )}
+          </div>
           {(isAuxiliar || isSuperAdmin) && (
             <button
               onClick={() => setIsWizardOpen(true)}
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer shadow-sm hover:shadow-md"
+              className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer shadow-sm hover:shadow-md w-full sm:w-auto text-center whitespace-nowrap"
             >
               <Plus className="h-4 w-4" />
-              Nueva Identificación
+              Nueva ID
             </button>
           )}
         </div>
       </div>
-    </div>
 
       {/* PANEL DE MÓDULO TABULAR */}
       <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden print:hidden">
@@ -253,16 +280,35 @@ export function IdentificacionesModule() {
         {/* FILTROS GENERALES */}
         <div className="p-5 border-b border-border bg-muted/20 flex flex-wrap gap-4 items-center">
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest hidden md:block">Filtros de Búsqueda</p>
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input 
-              type="text" 
-              title="Buscar por documento de integrante, documento encuestador, microterritorio o dirección"
-              placeholder="C.C. Paciente / Encuestador / Micro / Dir" 
-              className="pl-9 pr-4 py-2.5 border rounded-xl text-sm font-semibold bg-background border-input outline-none focus:ring-2 focus:ring-primary min-w-[320px]" 
-              value={qBusqueda} 
-              onChange={e => setQBusqueda(e.target.value)} 
-            />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-1">
+            <div className="relative w-full">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input 
+                type="text" 
+                title="Buscar por documento de integrante, documento encuestador, microterritorio o dirección"
+                placeholder="C.C. Paciente / Encuestador / Micro / Dir" 
+                className="w-full pl-9 pr-4 py-2.5 border rounded-xl text-sm font-semibold bg-background border-input outline-none focus:ring-2 focus:ring-primary" 
+                value={qBusqueda} 
+                onChange={e => setQBusqueda(e.target.value)} 
+                onKeyDown={handleKeyDown}
+              />
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button 
+                onClick={handleSearch}
+                className="w-full sm:w-auto px-4 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl shadow-sm hover:bg-primary/90 transition-colors"
+              >
+                Buscar
+              </button>
+              {activeSearch && (
+                <button 
+                  onClick={() => { setQBusqueda(""); setActiveSearch(""); setPage(1); }}
+                  className="w-full sm:w-auto px-4 py-2.5 border border-border bg-background text-foreground font-bold rounded-xl shadow-sm hover:bg-muted transition-colors"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
           </div>
           <select 
             className="px-4 py-2.5 border rounded-xl text-sm font-semibold bg-background border-input outline-none focus:ring-2 focus:ring-primary min-w-[140px]"
@@ -365,6 +411,32 @@ export function IdentificacionesModule() {
             </table>
           </div>
         )}
+
+        {/* PAGINACIÓN */}
+        {!loading && pagination.totalPages > 1 && (
+          <div className="p-4 border-t border-border bg-muted/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground font-medium">
+              Mostrando página <span className="font-bold text-foreground">{pagination.page}</span> de <span className="font-bold text-foreground">{pagination.totalPages}</span>
+              {' '}(Total: {pagination.totalCount} registros)
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={pagination.page <= 1}
+                className="px-4 py-2 border border-border bg-background hover:bg-muted text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                disabled={pagination.page >= pagination.totalPages}
+                className="px-4 py-2 border border-border bg-background hover:bg-muted text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {showMicroModal && (
@@ -450,6 +522,7 @@ export function IdentificacionesModule() {
                         setEditFicha(selectedFichaDetail)
                         setIsWizardOpen(true)
                       }}
+                      onRefreshFicha={() => handleViewFicha(selectedFichaDetail.id)}
                     />
                   </div>
                   {/* Elemento reservado SÓLO para el momento crítico de imprimir */}

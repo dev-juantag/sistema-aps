@@ -132,7 +132,7 @@ export default function Step4Integrantes() {
                       {PARENTESCO.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
                     </select>
                   </F>
-                  <F label="Sexo" required>
+                  <F label="Género" required>
                     <select {...register(`integrantes.${i}.sexo`)} onChange={(e) => { register(`integrantes.${i}.sexo`).onChange(e); if (e.target.value === 'HOMBRE') setValue(`integrantes.${i}.gestante`, 'NA'); }} className={sel}>
                       <option value="">— Selecciona —</option>
                       {SEXO.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}

@@ -15,7 +15,6 @@ import Step2Vivienda from "@/components/identificaciones/wizard/Step2Vivienda"
 import Step3Familia from "@/components/identificaciones/wizard/Step3Familia"
 import Step4Integrantes from "@/components/identificaciones/wizard/Step4Integrantes"
 import Step5Salud from "@/components/identificaciones/wizard/Step5Salud"
-import Step6Familiograma from "@/components/identificaciones/wizard/Step6Familiograma"
 import ConfirmModal from "@/components/ui/ConfirmModal"
 import { useAuth } from "@/lib/auth-context"
 
@@ -25,7 +24,6 @@ const STEPS = [
   { id: 3, title: "Familia", icon: Users },
   { id: 4, title: "Integrantes", icon: UserPlus },
   { id: 5, title: "Salud", icon: HeartPulse },
-  { id: 6, title: "Familiograma", icon: Users },
 ]
 
 const defaultIntegrante = {
@@ -153,7 +151,7 @@ export function IdentificacionesWizard({
 
       if (step === 1) return ["estadoVisita", "departamento", "municipio", "centroPoblado", "direccion", "numEBS", "prestadorPrimario", "tipoDocEncuestador", "numDocEncuestador", "perfilEncuestador"]
       if (step === 2) return ["numHogar", "numFamilia", "codFicha", "tipoVivienda", "tipoViviendaDesc", "matParedes", "matPisos", "matTechos", "numHogares", "numDormitorios", "estratoSocial", "hacinamiento", "fuenteAgua", "dispExcretas", "aguasResiduales", "dispResiduos", "riesgoAccidente", "fuenteEnergia", "presenciaVectores", "animales", "cantAnimales", "vacunacionMascotas"]
-      if (step === 3) return ["tipoFamilia", "numIntegrantes", "apgar", "ecomapa", "cuidadorPrincipal", "zarit", "vulnerabilidades"]
+      if (step === 3) return ["tipoFamilia", "numIntegrantes", "apgar", "apgarRespuestas", "ecomapa", "cuidadorPrincipal", "zarit", "vulnerabilidades"]
       
       const numIntegrantes = methods.getValues("integrantes")?.length || 0
       const fields: string[] = []
@@ -199,6 +197,7 @@ export function IdentificacionesWizard({
             `integrantes.${i}.lactanciaMaterna`,
             `integrantes.${i}.lactanciaMeses`,
             `integrantes.${i}.esquemaAtenciones`,
+            `integrantes.${i}.esquemaVacunacion`,
             `integrantes.${i}.intervencionesPendientes`,
             `integrantes.${i}.enfermedadAguda`,
             `integrantes.${i}.recibeAtencionMedica`,
@@ -206,7 +205,6 @@ export function IdentificacionesWizard({
           )
         }
       }
-      if (step === 6) return ["familiogramaCodigo"]
       return fields
     }
 
@@ -215,7 +213,7 @@ export function IdentificacionesWizard({
 
     if (isStepValid) {
       setStepError("")
-      setCurrentStep((s) => Math.min(s + 1, 6))
+      setCurrentStep((s) => Math.min(s + 1, 5))
       window.scrollTo(0, 0)
     } else {
       const errs = methods.formState.errors
@@ -265,33 +263,63 @@ export function IdentificacionesWizard({
         primerNombre: 'Primer nombre', segundoNombre: 'Segundo nombre',
         primerApellido: 'Primer apellido', segundoApellido: 'Segundo apellido',
         tipoDoc: 'Tipo documento', numDoc: 'Número documento',
-        fechaNacimiento: 'Fecha de nacimiento', sexo: 'Sexo', parentesco: 'Parentesco',
+        fechaNacimiento: 'Fecha de nacimiento', sexo: 'Género', parentesco: 'Parentesco',
         gestante: 'Gestante', nivelEducativo: 'Nivel educativo', ocupacion: 'Ocupación',
         regimen: 'Régimen', eapb: 'EAPB', etnia: 'Etnia',
       }
 
       const prettyLabel = (key: string) => {
-        // ej: "integrantes[0].primerNombre" → "Integrante 1 · Primer nombre"
-        const m = key.match(/integrantes\[(\d+)\]\.(.+)/)
+        // ej: "integrantes[0].primerNombre" o "integrantes.0.primerNombre" → "Integrante 1 · Primer nombre"
+        const m = key.match(/^integrantes(?:\[|\.)(\d+)(?:\]\.|\.)(.+)/)
         if (m) return `Integrante ${parseInt(m[1]) + 1} → ${fieldLabels[m[2]] || m[2]}`
         return fieldLabels[key] || key
       }
 
       let explicitLogs: string[] = []
-      if (currentStep === 4 || currentStep === 5) {
-         if (errs.integrantes) explicitLogs = flattenErrors({ integrantes: errs.integrantes })
-      } else {
-         const stepErrorFilter: any = {}
-         stepFields.forEach(field => {
-           if (errs[field as keyof WizardData]) stepErrorFilter[field] = errs[field as keyof WizardData]
-         })
-         explicitLogs = flattenErrors(stepErrorFilter)
+      
+      const stepErrorFilter: any = {}
+      stepFields.forEach(field => {
+         // Resolvemos tanto la anotación con puntos como la estructura profunda
+         const parts = field.split('.')
+         let nestedVal: any = errs
+         for (let p of parts) {
+            if (nestedVal) nestedVal = nestedVal[p]
+         }
+         
+         if (nestedVal?.message) {
+            stepErrorFilter[field] = nestedVal
+         } else if ((errs as any)[field]?.message) {
+            stepErrorFilter[field] = (errs as any)[field]
+         }
+      })
+      
+      // Caso de error en array general (ej: debe haber al menos un integrante)
+      if ((errs as any).integrantes?.message) {
+         stepErrorFilter['integrantes'] = (errs as any).integrantes
       }
 
-      setStepError(explicitLogs.map(e => {
-        const [fieldKey, ...rest] = e.split(': ')
-        return `${prettyLabel(fieldKey)}: ${rest.join(': ')}` 
-      }).join('||'))
+      explicitLogs = flattenErrors(stepErrorFilter)
+
+      // Fallback: Si el filtro se saltó algo importante, mostrar todos los errores del formulario temporalmente para poder diagnosticarlo
+      if (explicitLogs.length === 0) {
+         const rawLogs = flattenErrors(errs);
+         if (rawLogs.length > 0) {
+             setStepError("FALLBACK DIAGNÓSTICO. Falta: " + rawLogs.map(e => {
+                // Remove trailing objects if it's deeply nested
+                return e.length > 100 ? e.substring(0, 100) : e;
+             }).join(" || "))
+             return;
+         }
+      }
+
+      if (explicitLogs.length > 0) {
+        setStepError(explicitLogs.map(e => {
+          const [fieldKey, ...rest] = e.split(': ')
+          return `${prettyLabel(fieldKey)}: ${rest.join(': ')}` 
+        }).join('||'))
+      } else {
+        setStepError("Hay errores ocultos en los datos. Múltiples campos vacíos o 'methods.formState.errors' está vacío. Intenta llenar todos los campos obligatorios (*) y vuelve a intentarlo.")
+      }
     }
   }
 
@@ -314,9 +342,14 @@ export function IdentificacionesWizard({
       const method = existingFicha ? "PUT" : "POST"
       const url = existingFicha ? `/api/identificaciones/${existingFicha.id}` : "/api/identificaciones"
 
+      const token = localStorage.getItem("salud-pereira-token") || ""
+
       const response = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify({ 
           ...payload, 
           coords, 
@@ -481,7 +514,6 @@ export function IdentificacionesWizard({
               {currentStep === 3 && <Step3Familia />}
               {currentStep === 4 && <Step4Integrantes />}
               {currentStep === 5 && <Step5Salud />}
-              {currentStep === 6 && <Step6Familiograma />}
             </div>
           </div>
 
@@ -514,7 +546,7 @@ export function IdentificacionesWizard({
             </button>
             <div className="flex-1" />
             
-            {currentStep === 6 || (currentStep === 1 && estadoVisita !== '1') ? (
+            {currentStep === 5 || (currentStep === 1 && estadoVisita !== '1') ? (
               <button
                 type="button"
                 onClick={async () => {

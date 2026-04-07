@@ -1,0 +1,1 @@
+async function run(){ const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); const f = await prisma.fichaHogar.findUnique({ where: { id: 'a3db9073-35e1-449a-9802-df81a834fe7c' }, select: { familiogramaCodigo: true } }); console.log(f); await prisma.(); } run().catch(console.error);
