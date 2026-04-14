@@ -488,53 +488,7 @@ export function IdentificacionesModule() {
         )}
       </div>
 
-      {showMicroModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-card w-full max-w-md rounded-2xl shadow-xl border border-border overflow-hidden text-center">
-            <div className="p-6 border-b border-border bg-muted/30 flex flex-col items-center">
-              <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
-                <AlertTriangle className="w-7 h-7" />
-              </div>
-              <h2 className="text-xl font-bold text-foreground">Nueva Identificación</h2>
-              <p className="text-sm text-muted-foreground mt-2 leading-relaxed max-w-sm">
-                ¿Estás seguro de que deseas iniciar una nueva identificación para este territorio? Asegúrate de que el hogar no haya sido identificado anteriormente.
-              </p>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-foreground mb-2">Selecciona el Microterritorio</label>
-                <select 
-                  className="w-full px-4 py-3 rounded-xl border border-input bg-background font-semibold text-sm focus:ring-2 focus:ring-primary outline-none"
-                  value={selectedMicro}
-                  onChange={(e) => setSelectedMicro(e.target.value)}
-                >
-                  <option value="MT01">Microterritorio 1</option>
-                  <option value="MT02">Microterritorio 2</option>
-                  <option value="MT03">Microterritorio 3</option>
-                  <option value="MT04">Microterritorio 4</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex bg-muted/50 border-t border-border p-4 gap-3">
-              <button 
-                onClick={() => setShowMicroModal(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl font-semibold border border-input bg-background hover:bg-muted transition-colors text-foreground text-sm shadow-sm"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  setShowMicroModal(false)
-                  setIsWizardOpen(true)
-                }}
-                className="flex-1 px-4 py-2.5 rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm shadow-sm"
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* MODAL VISTA DETALLADA Y PRINT */}
       {showDetailModal && (
@@ -609,10 +563,35 @@ export function IdentificacionesModule() {
                 Nueva Identificación
               </h2>
               
-              <p className="text-slate-600 font-medium text-lg leading-relaxed mb-10 px-4">
+              <p className="text-slate-600 font-medium text-lg leading-relaxed mb-6 px-4 text-center">
                 ¿Estás seguro de que deseas iniciar una nueva identificación para este territorio? 
-                <span className="block mt-2 text-slate-400 text-sm">Asegúrate de que el hogar no haya sido identificado anteriormente.</span>
               </p>
+
+              <div className="w-full bg-slate-50 p-6 rounded-[2rem] border border-slate-100 mb-8">
+                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3 text-left">
+                  Selecciona el Microterritorio (MT)
+                </label>
+                <select 
+                  className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white font-bold text-slate-700 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all appearance-none cursor-pointer"
+                  value={selectedMicro}
+                  onChange={(e) => setSelectedMicro(e.target.value)}
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 1.25rem center',
+                    backgroundSize: '1.25rem'
+                  }}
+                >
+                  {[1, 2, 3, 4].map((num) => (
+                    <option key={num} value={`MT0${num}`}>
+                      Microterritorio {num} (MT0{num})
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-3 text-[11px] text-slate-400 font-bold uppercase text-left">
+                  📍 Requerido para la ubicación exacta del hogar
+                </p>
+              </div>
 
               <div className="grid grid-cols-2 gap-4 w-full">
                 <button

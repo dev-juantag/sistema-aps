@@ -52,6 +52,9 @@ export default function Step1InfoGeneral() {
           <F label="Municipio" required>
             <input {...register('municipio')} readOnly className={`${inp} bg-gray-100 cursor-not-allowed text-gray-600 font-bold`} />
           </F>
+          <F label="Microterritorio" required>
+            <input {...register('microterritorio')} readOnly className={`${inp} bg-gray-100 cursor-not-allowed text-gray-600 font-bold`} />
+          </F>
           <F label="UZPE">
             <input {...register('uzpe')} placeholder="UZPE" className={inp} />
           </F>

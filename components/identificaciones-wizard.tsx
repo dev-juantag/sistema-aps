@@ -94,6 +94,7 @@ export function IdentificacionesWizard({
           perfilEncuestador: user?.rol === "auxiliar" ? "auxiliar" : "otro",
           tipoDocEncuestador: "CC",
           numDocEncuestador: user?.documento || "",
+          microterritorio: microterritorio || "MT01",
           fuenteAgua: [],
           dispExcretas: [],
           aguasResiduales: [],
@@ -354,7 +355,6 @@ export function IdentificacionesWizard({
           ...payload, 
           coords, 
           territorio: territorioId, 
-          microterritorio,
           encuestadorId: user?.id,
           userId: user?.id,
           encuestadorNombreRaw: user ? `${user.nombre} ${user.apellidos}`.trim() : null
@@ -457,7 +457,7 @@ export function IdentificacionesWizard({
                 </button>
                 <div>
                   <h1 className="font-bold text-base text-foreground tracking-tight leading-tight">Nueva Identificación</h1>
-                  <p className="text-xs text-muted-foreground font-semibold">Territorio: {numTerritorioStr} · Micro: {microterritorio.replace('M', '')}</p>
+                  <p className="text-xs text-muted-foreground font-semibold">Territorio: {numTerritorioStr} · Micro: {microterritorio.replace('MT', '')}</p>
                 </div>
               </div>
               <div

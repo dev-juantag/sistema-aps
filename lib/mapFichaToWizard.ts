@@ -9,6 +9,7 @@ export const mapFichaToWizardData = (ficha: any, encuestadorDoc: string, encuest
     centroPoblado: ficha.centroPoblado || '',
     descripcionUbicacion: ficha.descripcionUbicacion || '',
     uzpe: ficha.uzpe || '',
+    microterritorio: ficha.microterritorio || '',
     direccion: ficha.direccion || '',
     latitud: ficha.latitud ? String(ficha.latitud) : undefined,
     longitud: ficha.longitud ? String(ficha.longitud) : undefined,

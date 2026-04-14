@@ -90,6 +90,7 @@ export const wizardSchema = z.object({
   centroPoblado: z.string().optional().nullable().transform(v => v?.toUpperCase() || ''),
   descripcionUbicacion: z.string().optional().nullable(),
   direccion: z.string().min(1, 'Requerido').transform(v => v.toUpperCase()),
+  microterritorio: z.string().optional().nullable(),
   latitud: z.string().optional().nullable(),
   longitud: z.string().optional().nullable(),
   uzpe: z.string().optional().nullable(),
