@@ -712,16 +712,20 @@ export function DashboardHome() {
             <h2 className="text-lg font-semibold text-foreground">
               {isFacturador 
                 ? "Distribución por Estado de Facturación" 
-                : user?.rol === "auxiliar" || isEnfermeraJefe 
-                  ? "Estado de Identificaciones del Territorio" 
-                  : "Mi Productividad Semanal (Atenciones)"}
+                : isAdmin
+                  ? "Atenciones por Programa Global"
+                  : user?.rol === "auxiliar" || isEnfermeraJefe 
+                    ? "Estado de Identificaciones del Territorio" 
+                    : "Mi Productividad Semanal (Atenciones)"}
             </h2>
           </div>
           {(isFacturador 
             ? chartDataFacturacion 
-            : (user?.rol === "auxiliar" || isEnfermeraJefe 
-                ? chartDataIdAuxiliar 
-                : chartDataMisAtencionesDiarias)).length === 0 ? (
+            : (isAdmin 
+                ? chartDataAtenciones 
+                : (user?.rol === "auxiliar" || isEnfermeraJefe 
+                    ? chartDataIdAuxiliar 
+                    : chartDataMisAtencionesDiarias))).length === 0 ? (
             <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
               No hay datos para mostrar.
             </div>
@@ -751,7 +755,7 @@ export function DashboardHome() {
           ) : (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={user?.rol === "auxiliar" || isEnfermeraJefe ? chartDataIdAuxiliar : chartDataMisAtencionesDiarias} margin={{ top: 5, right: 10, left: -20, bottom: 40 }}>
+                <BarChart data={isAdmin ? chartDataAtenciones : (user?.rol === "auxiliar" || isEnfermeraJefe ? chartDataIdAuxiliar : chartDataMisAtencionesDiarias)} margin={{ top: 5, right: 10, left: -20, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.90 0.02 285)" />
                   <XAxis
                     dataKey="nombre"
@@ -771,9 +775,9 @@ export function DashboardHome() {
                     }}
                   />
                   <Bar 
-                    dataKey={user?.rol === "auxiliar" || isEnfermeraJefe ? "cantidad" : "atenciones"} 
-                    name={user?.rol === "auxiliar" || isEnfermeraJefe ? "Cantidad" : "Atenciones"} 
-                    fill={user?.rol === "auxiliar" ? "oklch(0.50 0.18 285)" : "oklch(0.60 0.2 150)"} 
+                    dataKey={isAdmin ? "atenciones" : (user?.rol === "auxiliar" || isEnfermeraJefe ? "cantidad" : "atenciones")} 
+                    name={isAdmin ? "Atenciones" : (user?.rol === "auxiliar" || isEnfermeraJefe ? "Cantidad" : "Atenciones")} 
+                    fill={isAdmin ? "oklch(0.60 0.2 150)" : (user?.rol === "auxiliar" ? "oklch(0.50 0.18 285)" : "oklch(0.60 0.2 150)")} 
                     radius={[4, 4, 0, 0]} 
                   />
                 </BarChart>
@@ -791,7 +795,7 @@ export function DashboardHome() {
             </div>
             {chartDataIdentificacionesRoles.length === 0 ? (
               <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                No hay identificaciones.
+                No hay identificaciones registradas.
               </div>
             ) : (
               <div className="h-64">
