@@ -205,7 +205,7 @@ function PrintHandler({ setPrintImage }: { setPrintImage: (url: string) => void 
   return null;
 }
 
-export default function FamiliogramaStaticViewer({ jsonString }: { jsonString: string }) {
+export default function FamiliogramaStaticViewer({ jsonString, isPrintView = false }: { jsonString: string, isPrintView?: boolean }) {
   const [printImage, setPrintImage] = useState<string | null>(null);
 
   const { nodes, edges } = useMemo(() => {
@@ -242,10 +242,10 @@ export default function FamiliogramaStaticViewer({ jsonString }: { jsonString: s
             margin: 10px 0 !important;
           }
           .react-flow-wrapper {
-             display: none !important;
+             display: ${isPrintView ? 'none !important' : 'block !important'};
           }
           .print-image-wrapper {
-             display: block !important;
+             display: ${isPrintView ? 'block !important' : 'none !important'};
              width: 100%;
              text-align: center;
           }
@@ -279,8 +279,10 @@ export default function FamiliogramaStaticViewer({ jsonString }: { jsonString: s
             multiSelectionKeyCode={null}
             selectionKeyCode={null}
             deleteKeyCode={null}
+            minZoom={0.05}
+            maxZoom={1.5}
           >
-            <PrintHandler setPrintImage={setPrintImage} />
+            {isPrintView && <PrintHandler setPrintImage={setPrintImage} />}
           </ReactFlow>
         </ReactFlowProvider>
       </div>

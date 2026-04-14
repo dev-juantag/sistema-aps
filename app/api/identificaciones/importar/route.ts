@@ -1,9 +1,18 @@
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 
+import { 
+  ESTADO_VISITA, TIPO_VIVIENDA, MATERIAL_PAREDES, MATERIAL_PISOS, MATERIAL_TECHOS,
+  FUENTE_AGUA, DISPOSICION_EXCRETAS, AGUAS_RESIDUALES, DISPOSICION_RESIDUOS,
+  RIESGO_ACCIDENTE, FUENTE_ENERGIA, ANIMALES, TIPO_FAMILIA, APGAR_OPCIONES,
+  ZARIT_OPCIONES, ECOMAPA_OPCIONES, TIPO_DOCUMENTO, SEXO, PARENTESCO,
+  NIVEL_EDUCATIVO, OCUPACION, ETNIA, GRUPO_POBLACIONAL, DISCAPACIDADES,
+  INTERVENCIONES_PENDIENTES, DIAGNOSTICO_NUTRICIONAL, REMISIONES_APS,
+  VULNERABILIDADES, REGIMEN_SALUD, ANTECEDENTES_CRONICOS, ANTECEDENTES_TRANSMISIBLES
+} from "@/lib/constants"
+
 // ============================================================
 // MAPA DE TERRITORIOS: codigo corto => nombre en BD
-// Actualiza este mapa si agregas más territorios
 // ============================================================
 const TERRITORIO_MAP: Record<string, string> = {
   'T01': 'TERRITORIO DEL CAFE 1',
@@ -49,27 +58,43 @@ const TERRITORIO_MAP: Record<string, string> = {
   'T43': 'CARCEL LA 40',
 }
 
+function getLabelId(arr: any[], label: string): any {
+  if (!label) return null
+  const clean = label.trim().toLowerCase()
+  // Primero ver si es un número directo
+  const num = parseInt(clean)
+  if (!isNaN(num) && arr.find(x => String(x.id) === clean)) return num
+  // Si no, buscar por etiqueta
+  const found = arr.find(x => x.label.toLowerCase() === clean)
+  return found ? found.id : null
+}
+
 function safeFloat(val: string | undefined | null): number | null {
   if (!val || val.trim() === '') return null
   const parsed = parseFloat(val.trim().replace(',', '.'))
   return isNaN(parsed) ? null : parsed
 }
 
-function safeInt(val: string | undefined | null): number | null {
+function safeInt(val: string | undefined | null, catalog?: any[]): any {
   if (!val || val.trim() === '') return null
+  if (catalog) return getLabelId(catalog, val)
   const parsed = parseInt(val.trim(), 10)
   return isNaN(parsed) ? null : parsed
 }
 
-function safeIntArray(val: string | undefined | null): number[] {
-  if (!val || val.trim() === '' || val.toLowerCase() === 'na') return []
-  return val.split(',').map(v => parseInt(v.trim(), 10)).filter(n => !isNaN(n))
+function safeIntArray(val: string | undefined | null, catalog?: any[]): any[] {
+  if (!val || val.trim() === '' || val.toLowerCase() === 'na' || val === '""') return []
+  const parts = val.split(',').map(v => v.trim()).filter(Boolean)
+  if (catalog) {
+    return parts.map(p => getLabelId(catalog, p)).filter(id => id !== null)
+  }
+  return parts.map(v => parseInt(v, 10)).filter(n => !isNaN(n))
 }
 
 function getBoolean(val: string | undefined | null): boolean | null {
   if (!val || val.trim() === '') return null
   const l = val.trim().toLowerCase()
-  if (l === '1' || l === 'si' || l === 'true' || l === 'yes') return true
+  if (l === '1' || l === 'si' || l === 'true' || l === 'yes' || l === 'sí') return true
   if (l === '2' || l === 'no' || l === 'false') return false
   return null
 }
@@ -77,28 +102,20 @@ function getBoolean(val: string | undefined | null): boolean | null {
 function normalizeMicro(val: string | null | undefined): string | null {
   if (!val || val.trim() === '') return null
   const v = val.trim()
-  // "M1" => "MT01", "MT4" => "MT04", "MT01" => "MT01"
   const match = v.match(/^M(?:T)?(\d+)$/i)
   if (match) return `MT${match[1].padStart(2, '0')}`
   return v
 }
 
-// Convierte texto de estado del CSV al ID numérico del sistema
-// El sistema usa: '1'=Efectiva, '2'=No Efectiva/Rechazada, '3'=Negada
 function normalizeEstadoVisita(val: string): string {
   const v = (val || '').trim().toLowerCase()
-  if (v === '1' || v === 'efectiva') return '1'
-  if (v === '2' || v === 'no efectiva' || v === 'rechazada' || v === 'no_efectiva') return '2'
-  if (v === '3' || v === 'negada' || v === 'deny') return '3'
-  return '1' // default: Efectiva
+  const id = getLabelId(ESTADO_VISITA, v)
+  return id ? String(id) : '1'
 }
 
-// Lee valor del objeto con insensibilidad a mayúsculas en la clave
 function get(obj: Record<string, string>, ...keys: string[]): string {
   for (const key of keys) {
-    // Buscar la clave exacta primero
     if (obj[key] !== undefined) return obj[key]
-    // Luego buscar en minúsculas
     const lower = key.toLowerCase()
     if (obj[lower] !== undefined) return obj[lower]
   }
@@ -238,27 +255,27 @@ export async function POST(req: Request) {
           numIntegrantes: safeInt(get(h, 'nroPersonasVivienda', 'numintegrantes')) || integrantes.length,
 
           // ── Datos Físicos de Vivienda y Saneamiento ───────────────────
-          tipoVivienda: safeInt(get(h, 'tipoVivienda', 'tipovivienda')),
-          matParedes: safeInt(get(h, 'matParedes', 'matparedes')),
-          matPisos: safeInt(get(h, 'matPisos', 'matpisos')),
-          matTechos: safeInt(get(h, 'matTechos', 'mattechos')),
+          tipoVivienda: safeInt(get(h, 'tipoVivienda', 'tipovivienda'), TIPO_VIVIENDA),
+          matParedes: safeInt(get(h, 'matParedes', 'matparedes'), MATERIAL_PAREDES),
+          matPisos: safeInt(get(h, 'matPisos', 'matpisos'), MATERIAL_PISOS),
+          matTechos: safeInt(get(h, 'matTechos', 'mattechos'), MATERIAL_TECHOS),
           numHogares: safeInt(get(h, 'nroHogaresVivienda', 'nrohogaresvivienda', 'numhogares')),
           estratoSocial: safeInt(get(h, 'estratoSocial', 'estratosocial')),
           hacinamiento: getBoolean(get(h, 'hacinamiento')),
-          fuenteAgua: safeIntArray(get(h, 'principalFuenteAguaConsumoHumano', 'fuenteagua')),
-          dispExcretas: safeIntArray(get(h, 'disposicionExcretas', 'disposicionexcretas', 'dispexcretas')),
-          aguasResiduales: safeIntArray(get(h, 'disposicionAguaResidual', 'disposicionaguaresidual', 'aguasresiduales')),
-          dispResiduos: safeIntArray(get(h, 'disposicionResiduosSolidos', 'disposicionresiduossolidos', 'dispresiduos')),
-          riesgoAccidente: safeIntArray(get(h, 'codRiesgoAccidenteVivienda', 'codriesgoaccidentevivienda', 'riesgoaccidente')),
-          fuenteEnergia: safeInt(get(h, 'fuentesEnergiaCombustibleCocinar', 'fuentesenergiacombustiblecocinar', 'fuenteenergia')),
+          fuenteAgua: safeIntArray(get(h, 'principalFuenteAguaConsumoHumano', 'fuenteagua'), FUENTE_AGUA),
+          dispExcretas: safeIntArray(get(h, 'disposicionExcretas', 'disposicionexcretas', 'dispexcretas'), DISPOSICION_EXCRETAS),
+          aguasResiduales: safeIntArray(get(h, 'disposicionAguaResidual', 'disposicionaguaresidual', 'aguasresiduales'), AGUAS_RESIDUALES),
+          dispResiduos: safeIntArray(get(h, 'disposicionResiduosSolidos', 'disposicionresiduossolidos', 'dispresiduos'), DISPOSICION_RESIDUOS),
+          riesgoAccidente: safeIntArray(get(h, 'codRiesgoAccidenteVivienda', 'codriesgoaccidentevivienda', 'riesgoaccidente'), RIESGO_ACCIDENTE),
+          fuenteEnergia: safeInt(get(h, 'fuentesEnergiaCombustibleCocinar', 'fuentesenergiacombustiblecocinar', 'fuenteenergia'), FUENTE_ENERGIA),
           presenciaVectores: getBoolean(get(h, 'observaCriaderosVectores', 'observacriaderosvectores', 'presenciavectores')),
-          animales: safeIntArray(get(h, 'animalesEnViviendaEntornoInmediato', 'animalesenviviendaentornoinmediato', 'animales')),
+          animales: safeIntArray(get(h, 'animalesEnViviendaEntornoInmediato', 'animalesenviviendaentornoinmediato', 'animales'), ANIMALES),
           cantAnimales: safeInt(get(h, 'numeroAnimales', 'numeroanimales', 'cantanimales')),
           vacunacionMascotas: getBoolean(get(h, 'vacunacionMascotas', 'vacunacionmascotas')),
 
           // ── Datos Familiares ──────────────────────────────────────────────
-          tipoFamilia: safeInt(get(h, 'tipoFamilia', 'tipofamilia')),
-          apgar: safeInt(get(h, 'codResultadoAPGAR', 'codresultadoapgar', 'apgar')),
+          tipoFamilia: safeInt(get(h, 'tipoFamilia', 'tipofamilia'), TIPO_FAMILIA),
+          apgar: safeInt(get(h, 'codResultadoAPGAR', 'codresultadoapgar', 'apgar'), APGAR_OPCIONES),
           apgarRespuestas: [
             safeInt(get(h, 'apgar_P1', 'apgar_p1')) ?? 0,
             safeInt(get(h, 'apgar_P2', 'apgar_p2')) ?? 0,
@@ -266,10 +283,10 @@ export async function POST(req: Request) {
             safeInt(get(h, 'apgar_P4', 'apgar_p4')) ?? 0,
             safeInt(get(h, 'apgar_P5', 'apgar_p5')) ?? 0,
           ].filter(x => x !== null),
-          ecomapa: safeInt(get(h, 'ecomapa', 'ecomapa')),
+          ecomapa: safeInt(get(h, 'ecomapa', 'ecomapa'), ECOMAPA_OPCIONES),
           cuidadorPrincipal: getBoolean(get(h, 'cuidador', 'cuidadorprincipal')),
-          zarit: safeInt(get(h, 'escalaZARIT', 'escalazarit', 'zarit')),
-          vulnerabilidades: get(h, 'Vulnerabilidad', 'vulnerabilidad').split(',').map(s => s.trim()).filter(Boolean)
+          zarit: safeInt(get(h, 'escalaZARIT', 'escalazarit', 'zarit'), ZARIT_OPCIONES),
+          vulnerabilidades: safeIntArray(get(h, 'Vulnerabilidad', 'vulnerabilidad'), VULNERABILIDADES)
         }
 
         let ficha
@@ -285,22 +302,26 @@ export async function POST(req: Request) {
           const doc = get(int, 'nroDocumento', 'documento', 'nrodocumento')
           if (!doc) continue
 
-          // Sexo
-          let sexo = get(int, 'sexo').trim()
-          if (sexo === '1' || sexo.toLowerCase() === 'masculino') sexo = 'HOMBRE'
-          else if (sexo === '2' || sexo.toLowerCase() === 'femenino') sexo = 'MUJER'
-          else sexo = 'HOMBRE'
+          const nombres = (get(int, 'nombres').trim() || get(int, 'primerNombre', 'primernombre')).toUpperCase()
+          const apellidos = (get(int, 'apellidos').trim() || get(int, 'primerApellido', 'primerapellido')).toUpperCase()
+          const tipoDoc = (get(int, 'tipoDocumento', 'tipodocumento', 'tipoDoc') || 'CC').toUpperCase()
+
+          // Sexo lookup
+          let sexoRaw = get(int, 'sexo').trim().toUpperCase()
+          let sexo = getLabelId(SEXO, sexoRaw) || 'HOMBRE'
+
+          // Regimen lookup
+          let regimenRaw = get(int, 'regimen').trim().toUpperCase()
+          let regimen = getLabelId(REGIMEN_SALUD, regimenRaw) || regimenRaw || null
 
           // Fecha nacimiento
           let fechaNacimiento = '1900-01-01'
           const rawFN = get(int, 'fechaNacimiento', 'fechanacimiento')
           if (rawFN) {
-            // Puede venir como "27/01/2001" o "2001-01-27"
             let fn = rawFN.split(' ')[0]
             if (fn.includes('/')) {
               const parts = fn.split('/')
               if (parts.length === 3) {
-                // d/m/yyyy o dd/mm/yyyy
                 fn = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`
               }
             }
@@ -308,45 +329,40 @@ export async function POST(req: Request) {
             if (!isNaN(parsedFN.getTime())) fechaNacimiento = fn
           }
 
-          const nombres = get(int, 'nombres').trim() || get(int, 'primerNombre', 'primernombre')
-          const apellidos = get(int, 'apellidos').trim() || get(int, 'primerApellido', 'primerapellido')
-          const tipoDoc = get(int, 'tipoDocumento', 'tipodocumento', 'tipoDoc').toUpperCase() || 'CC'
-
           const dataInt = {
-            nombres: nombres.toUpperCase(),
-            apellidos: apellidos.toUpperCase(),
+            nombres,
+            apellidos,
             tipoDoc,
             sexo,
             fechaNacimiento,
             telefono: get(int, 'telefono') || undefined,
-            parentesco: parseInt(get(int, 'rolEnLaFamilia', 'parentesco')) || 1,
+            parentesco: safeInt(get(int, 'rolEnLaFamilia', 'parentesco'), PARENTESCO) || 1,
             peso: safeFloat(get(int, 'peso')),
             talla: safeFloat(get(int, 'talla')),
             perimetroBraquial: safeFloat(get(int, 'perimetroBraquial', 'perimetrobraquial')),
             eapb: get(int, 'eapb') || null,
             gestante: getBoolean(get(int, 'gestantes', 'gestante')) ? 'SI' : 'NO',
             mesesGestacion: safeFloat(get(int, 'mesesGestacion', 'mesesgestacion')),
-            
-            // Más campos csv
             generoIdentidad: get(int, 'generoIdentidad', 'genero') || undefined,
-            nivelEducativo: safeInt(get(int, 'nivelEducativo', 'niveleducativo')),
-            ocupacion: safeInt(get(int, 'ocupacion')),
-            regimen: get(int, 'regimen') || undefined,
-            etnia: safeInt(get(int, 'etnia')),
+            nivelEducativo: safeInt(get(int, 'nivelEducativo', 'niveleducativo'), NIVEL_EDUCATIVO),
+            ocupacion: safeInt(get(int, 'ocupacion'), OCUPACION),
+            regimen,
+            etnia: safeInt(get(int, 'etnia'), ETNIA),
             puebloIndigena: get(int, 'pueblo indigena', 'puebloindigena') || null,
-            grupoPoblacional: safeIntArray(get(int, 'grupo poblacional', 'grupopoblacional')),
-            discapacidades: safeIntArray(get(int, 'discapacidad')),
-            diagNutricional: safeInt(get(int, 'diagNutricional', 'diagnutricional')),
+            grupoPoblacional: safeIntArray(get(int, 'grupo poblacional', 'grupopoblacional'), GRUPO_POBLACIONAL),
+            discapacidades: safeIntArray(get(int, 'discapacidad'), DISCAPACIDADES),
+            diagNutricional: safeInt(get(int, 'diagNutricional', 'diagnutricional'), DIAGNOSTICO_NUTRICIONAL),
             practicaDeportiva: getBoolean(get(int, 'practicaDeportiva', 'practicadeportiva')),
             lactanciaMaterna: getBoolean(get(int, 'lactanciaMaterna', 'lactanciamaterna')),
             lactanciaMeses: safeInt(get(int, 'lactanciaMeses', 'lactanciameses')),
             esquemaAtenciones: getBoolean(get(int, 'esquemaAtenciones', 'esquemaatenciones')),
             esquemaVacunacion: getBoolean(get(int, 'esquemaVacunacion', 'esquemavacunacion')),
-            intervencionesPendientes: safeIntArray(get(int, 'intervencionesPendientes', 'intervencionespendientes')),
+            intervencionesPendientes: safeIntArray(get(int, 'intervencionesPendientes', 'intervencionespendientes'), INTERVENCIONES_PENDIENTES),
             enfermedadAguda: getBoolean(get(int, 'enfermedadAguda', 'enfermedadaguda')),
             recibeAtencionMedica: getBoolean(get(int, 'recibeAtencionMedica', 'recibeatencionmedica')),
-            remisiones: get(int, 'remisiones') ? get(int, 'remisiones').split(',') : [],
-            
+            remisiones: safeIntArray(get(int, 'remisiones'), REMISIONES_APS).map(String),
+            antecedentes: safeIntArray(get(int, 'antecedentesCronicos', 'antecedentes'), ANTECEDENTES_CRONICOS),
+            antecTransmisibles: safeIntArray(get(int, 'antecedentesTransmisibles', 'antectransmisibles'), ANTECEDENTES_TRANSMISIBLES),
             fichaId: ficha.id,
           }
 

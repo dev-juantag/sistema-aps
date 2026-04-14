@@ -51,11 +51,18 @@ const COLORS = [
 ]
 
 export function AdminReportes() {
+  const [activeTab, setActiveTab] = useState<"atenciones" | "identificaciones">("atenciones")
+  const [filterMode, setFilterMode] = useState<"etapa" | "fechas" | "todo">("etapa")
+  const [dateRange, setDateRange] = useState({ 
+    start: new Date().toISOString().slice(0, 10), 
+    end: new Date().toISOString().slice(0, 10) 
+  })
+
   const { data: rawAtenciones, isLoading: loadingAtenciones } = useSWR<any>("/api/atenciones", fetcher)
   const { data: rawProgramas, isLoading: loadingProgramas } = useSWR<any>("/api/programas", fetcher)
   const { data: rawUsers, isLoading: loadingUsers } = useSWR<any>("/api/users", fetcher)
   const { data: stageSettings, isLoading: loadingStage } = useSWR<any>("/api/settings/stage", fetcher)
-  const { data: idStats, isLoading: loadingStats } = useSWR<any>("/api/identificaciones/stats", fetcher)
+  const { data: idStats, isLoading: loadingStats } = useSWR<any>(`/api/identificaciones/stats?filterMode=${filterMode}&startDate=${dateRange.start}&endDate=${dateRange.end}`, fetcher)
   
   const atenciones: any[] = Array.isArray(rawAtenciones) ? rawAtenciones : []
   const programas: any[] = Array.isArray(rawProgramas) ? rawProgramas : []
@@ -64,12 +71,7 @@ export function AdminReportes() {
   
   const loading = loadingAtenciones || loadingProgramas || loadingUsers || loadingStage || loadingStats
 
-  const [activeTab, setActiveTab] = useState<"atenciones" | "identificaciones">("atenciones")
-  const [filterMode, setFilterMode] = useState<"etapa" | "fechas" | "todo">("etapa")
-  const [dateRange, setDateRange] = useState({ 
-    start: new Date().toISOString().slice(0, 10), 
-    end: new Date().toISOString().slice(0, 10) 
-  })
+
 
   const [isRestarting, setIsRestarting] = useState(false)
   const [showRestartModal, setShowRestartModal] = useState(false)
@@ -149,8 +151,26 @@ export function AdminReportes() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {filterMode === "fechas" && (
+            <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-2 py-1 shadow-sm">
+              <input 
+                type="date" 
+                className="bg-transparent text-sm font-medium outline-none" 
+                value={dateRange.start} 
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })} 
+              />
+              <span className="text-muted-foreground font-medium">-</span>
+              <input 
+                type="date" 
+                className="bg-transparent text-sm font-medium outline-none" 
+                value={dateRange.end} 
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })} 
+              />
+            </div>
+          )}
+
           <select 
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
+            className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground focus:ring-2 focus:ring-primary outline-none"
             value={filterMode}
             onChange={(e) => setFilterMode(e.target.value as any)}
           >
@@ -364,42 +384,107 @@ export function AdminReportes() {
 
             <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
                <div className="flex items-center justify-between mb-4">
-                 <div className="p-3 bg-amber-100 text-amber-600 rounded-xl"><Briefcase className="h-6 w-6" /></div>
-                 <span className="text-[10px] text-amber-600 font-black uppercase">SocioEc</span>
+                 <div className="p-3 bg-amber-100 text-amber-600 rounded-xl"><Accessibility className="h-6 w-6" /></div>
+                 <span className="text-[10px] text-amber-600 font-black uppercase">Inclusión</span>
                </div>
-               <p className="text-sm text-muted-foreground font-medium mb-1">Rég. Subsidiado</p>
+               <p className="text-sm text-muted-foreground font-medium mb-1">PcD (Discapacidad)</p>
                <h3 className="text-4xl font-black text-foreground tabular-nums">
-                 {idStats?.aseguramiento?.regimen?.find((r: any) => r.name === "SUBSIDIADO")?.value || 0}
+                 {idStats?.kpis?.conDiscapacidad || 0}
                </h3>
-               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-amber-500/5 group-hover:text-amber-500/10 transition-colors"><Briefcase className="h-full w-full" /></div>
+               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-amber-500/5 group-hover:text-amber-500/10 transition-colors"><Accessibility className="h-full w-full" /></div>
+            </div>
+
+            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
+               <div className="flex items-center justify-between mb-4">
+                 <div className="p-3 bg-teal-100 text-teal-600 rounded-xl"><Baby className="h-6 w-6" /></div>
+                 <span className="text-[10px] text-teal-600 font-black uppercase">Infancia</span>
+               </div>
+               <p className="text-sm text-muted-foreground font-medium mb-1">Niños &lt; 10 años</p>
+               <h3 className="text-4xl font-black text-foreground tabular-nums flex items-baseline gap-2">
+                 {idStats?.kpis?.menores10 || 0}
+                 {(idStats?.kpis?.ninosDesnutricion || 0) > 0 && (
+                   <span className="text-sm font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full flex items-center gap-1 leading-none shadow-sm pb-1">
+                     <AlertTriangle className="h-3 w-3" />
+                     {idStats.kpis.ninosDesnutricion} con riesgo
+                   </span>
+                 )}
+               </h3>
+               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-teal-500/5 group-hover:text-teal-500/10 transition-colors"><Baby className="h-full w-full" /></div>
+            </div>
+
+            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
+               <div className="flex items-center justify-between mb-4">
+                 <div className="p-3 bg-gray-100 text-gray-600 rounded-xl"><Users className="h-6 w-6" /></div>
+                 <span className="text-[10px] text-gray-600 font-black uppercase">Vejez</span>
+               </div>
+               <p className="text-sm text-muted-foreground font-medium mb-1">Adultos (60+)</p>
+               <h3 className="text-4xl font-black text-foreground tabular-nums">{idStats?.kpis?.mayores60 || 0}</h3>
+               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-gray-500/5 group-hover:text-gray-500/10 transition-colors"><Users className="h-full w-full" /></div>
+            </div>
+
+            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
+               <div className="flex items-center justify-between mb-4">
+                 <div className="p-3 bg-red-100 text-red-600 rounded-xl"><ShieldAlert className="h-6 w-6" /></div>
+                 <span className="text-[10px] text-red-600 font-black uppercase">Alerta</span>
+               </div>
+               <p className="text-sm text-muted-foreground font-medium mb-1">Sin Aseguramiento</p>
+               <h3 className="text-4xl font-black text-foreground tabular-nums">{idStats?.kpis?.sinAseguramiento || 0}</h3>
+               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-red-500/5 group-hover:text-red-500/10 transition-colors"><ShieldAlert className="h-full w-full" /></div>
+            </div>
+
+            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
+               <div className="flex items-center justify-between mb-4">
+                 <div className="p-3 bg-purple-100 text-purple-600 rounded-xl"><HeartPulse className="h-6 w-6" /></div>
+                 <span className="text-[10px] text-purple-600 font-black uppercase">Acción</span>
+               </div>
+               <p className="text-sm text-muted-foreground font-medium mb-1">Remisiones APS</p>
+               <h3 className="text-4xl font-black text-foreground tabular-nums">{idStats?.kpis?.remitidos || 0}</h3>
+               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-purple-500/5 group-hover:text-purple-500/10 transition-colors"><HeartPulse className="h-full w-full" /></div>
             </div>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
              {/* 1. Ciclo de Vida y Genero */}
-             <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-6">
-                   <div className="flex items-center gap-2">
-                     <Layers className="h-5 w-5 text-primary" />
-                     <h3 className="text-lg font-bold">Población por Curso de Vida y Género</h3>
-                   </div>
-                   <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-widest">
-                     <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-[#081e69]"></div>Hom</div>
-                     <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-[#eb3b5a]"></div>Muj</div>
-                   </div>
-                </div>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart layout="vertical" data={idStats?.piramide || []} margin={{ top: 0, right: 30, left: 30, bottom: 0 }}>
-                       <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} opacity={0.3} />
+             {/* 1. Pirámide */}
+             <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col items-center">
+               <div className="w-full mb-4 flex items-center justify-between">
+                 <div className="flex items-center gap-2">
+                   <Layers className="h-5 w-5 text-primary" />
+                   <h2 className="text-lg font-bold text-foreground">
+                     Cursos de Vida y Género
+                   </h2>
+                 </div>
+                 <div className="flex items-center gap-3 text-[11px]">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-[#081e69]"></div>
+                      <span className="font-bold">HOMBRES: {idStats?.kpis?.totalHombres || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-[#eb3b5a]"></div>
+                      <span className="font-bold">MUJERES: {idStats?.kpis?.totalMujeres || 0}</span>
+                    </div>
+                 </div>
+               </div>
+               <div className="w-full h-80">
+                 {(idStats?.piramide?.length || 0) > 0 ? (
+                   <ResponsiveContainer width="100%" height="100%">
+                     <BarChart layout="vertical" data={idStats?.piramide || []} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+                       <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="oklch(0.9 0.02 285)" />
                        <XAxis type="number" hide />
-                       <YAxis dataKey="label" type="category" width={140} tick={{ fontSize: 11, fontWeight: 600, fill: "var(--foreground)" }} />
-                       <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 20px -5px rgba(0,0,0,0.1)" }} />
-                       <Bar dataKey="hombres" name="Hombres" fill="#081e69" stackId="a" radius={[0, 4, 4, 0]} barSize={25} />
-                       <Bar dataKey="mujeres" name="Mujeres" fill="#eb3b5a" stackId="a" radius={[4, 0, 0, 4]} barSize={25} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                       <YAxis dataKey="label" type="category" width={120} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
+                       <Tooltip
+                         cursor={{ fill: 'transparent' }}
+                         contentStyle={{ backgroundColor: "var(--card)", borderRadius: "12px", border: "1px solid var(--border)", boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)" }}
+                         formatter={(value: any, name: string) => [Math.abs(value), name === "mujeres" ? "Mujeres" : "Hombres"]}
+                       />
+                       <Bar dataKey="hombres" name="Hombres" fill="#081e69" stackId="a" radius={[0, 4, 4, 0]} barSize={20} />
+                       <Bar dataKey="mujeres" name="Mujeres" fill="#eb3b5a" stackId="a" radius={[4, 0, 0, 4]} barSize={20} />
+                     </BarChart>
+                   </ResponsiveContainer>
+                 ) : (
+                   <p className="text-muted-foreground mt-20 text-center text-sm">Sin datos para la pirámide poblacional.</p>
+                 )}
+               </div>
              </div>
 
              {/* 2. Régimen de Afiliación */}
@@ -453,11 +538,11 @@ export function AdminReportes() {
                      </div>
                   </div>
                   <div className="flex items-center gap-4 p-4 rounded-xl bg-blue-100/30 border border-blue-200">
-                     <Accessibility className="h-10 w-10 text-blue-500" />
+                     <Activity className="h-10 w-10 text-blue-500" />
                      <div>
-                       <span className="text-[10px] font-black text-blue-600 block mb-0.5">DISCAPACIDAD</span>
-                       <p className="text-2xl font-black text-foreground leading-none">{idStats?.kpis?.conDiscapacidad || 0}</p>
-                       <p className="text-[10px] text-blue-700 font-medium">Personas identificadas</p>
+                       <span className="text-[10px] font-black text-blue-600 block mb-0.5">ENF. AGUDA</span>
+                       <p className="text-2xl font-black text-foreground leading-none">{idStats?.kpis?.enfermedadAguda || 0}</p>
+                       <p className="text-[10px] text-blue-700 font-medium">Casos último mes</p>
                      </div>
                   </div>
                   <div className="flex items-center gap-4 p-4 rounded-xl bg-indigo-100/30 border border-indigo-200">

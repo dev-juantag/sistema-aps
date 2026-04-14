@@ -15,6 +15,8 @@ import {
   Eye,
 } from "lucide-react"
 import { PacienteDetail } from "./paciente-detail"
+import { toast } from "sonner"
+import ConfirmModal from "@/components/ui/ConfirmModal"
 
 export function AdminPacientes() {
   const { user, isSuperAdmin } = useAuth()
@@ -26,9 +28,11 @@ export function AdminPacientes() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Paciente>>({})
   const [errorEdit, setErrorEdit] = useState("")
-  
   // Estado de Visualización (Expediente Único)
   const [selectedPacienteId, setSelectedPacienteId] = useState<string | null>(null)
+  
+  // Estado confirmación borrar
+  const [deleteConfirmInfo, setDeleteConfirmInfo] = useState<{id: string, name: string} | null>(null)
 
   const filtered = useMemo(() => {
     return pacientes.filter((p) => {
@@ -43,7 +47,7 @@ export function AdminPacientes() {
   }, [pacientes, search])
 
   const handleExport = () => {
-    if (pacientes.length === 0) return alert("No hay pacientes para exportar.")
+    if (pacientes.length === 0) return toast.warning("No hay pacientes para exportar.")
 
     const headers = [
       "Nombre_Completo",
@@ -95,20 +99,28 @@ export function AdminPacientes() {
     document.body.removeChild(link)
   }
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`¿Está seguro de que desea eliminar permanentemente al paciente ${name}?\n\n¡ADVERTENCIA!\nSi el paciente tiene atenciones registradas el sistema no le dejará borrarlo para proteger la integridad de los datos.`)) return;
+  const handleDelete = (id: string, name: string) => {
+    setDeleteConfirmInfo({ id, name })
+  }
+
+  const executeDelete = async () => {
+    if (!deleteConfirmInfo) return;
+    const { id, name } = deleteConfirmInfo;
+    setDeleteConfirmInfo(null);
+    const toastId = toast.loading(`Eliminando paciente ${name}...`);
 
     try {
       const res = await fetch(`/api/pacientes/${id}`, { method: "DELETE" })
       if (res.ok) {
+        toast.success("Paciente eliminado correctamente", { id: toastId });
         mutatePacientes((prev: Paciente[] | undefined) => prev?.filter((p: Paciente) => p.id !== id), { revalidate: false });
       } else {
         const error = await res.json()
-        alert((error.error || "Error al eliminar el paciente") + (error.details ? "\nDetalles: " + error.details : ""))
+        toast.error((error.error || "Error al eliminar el paciente") + (error.details ? "\nDetalles: " + error.details : ""), { id: toastId })
       }
     } catch (e) {
       console.error(e)
-      alert("Error de conexión.")
+      toast.error("Error de conexión.", { id: toastId })
     }
   }
 
@@ -388,6 +400,18 @@ export function AdminPacientes() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        open={!!deleteConfirmInfo}
+        title="Eliminar Paciente"
+        message={`¿Está seguro de que desea eliminar permanentemente al paciente ${deleteConfirmInfo?.name}?\n\n¡ADVERTENCIA!\nSi el paciente tiene atenciones registradas el sistema no le dejará borrarlo para proteger la integridad de los datos.`}
+        confirmLabel="Sí, eliminar"
+        cancelLabel="Cancelar"
+        danger={true}
+        onConfirm={executeDelete}
+        onCancel={() => setDeleteConfirmInfo(null)}
+      />
 
     </div>
   )

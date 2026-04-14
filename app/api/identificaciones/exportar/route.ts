@@ -12,9 +12,12 @@ import {
 // Helper para limpiar el texto y evitar que rompa el CSV
 import { verifyToken } from '@/lib/verify-token'
 
-const cleanCsv = (val: any) => {
-  if (val === null || val === undefined) return '""'
-  const str = String(val).replace(/"/g, '""').replace(/\n/g, ' ').replace(/\r/g, '')
+const cleanCsv = (val: any, isNumber = false) => {
+  if (val === null || val === undefined || val === '') return '""'
+  let str = String(val).replace(/"/g, '""').replace(/\n/g, ' ').replace(/\r/g, '')
+  if (isNumber && (typeof val === 'number' || !isNaN(parseFloat(str)))) {
+    str = str.replace('.', ',')
+  }
   return `"${str}"`
 }
 
@@ -24,13 +27,21 @@ const safeParseJsonArray = (val: any): any[] => {
     try { return JSON.parse(val) } catch { return [] }
   }
   if (Array.isArray(val)) return val
+  if (typeof val === 'object') {
+    // Si es un objeto de Prisma (Map), lo convertimos a array de sus keys verdaderas
+    return Object.entries(val).filter(([_, v]) => v === true).map(([k]) => k)
+  }
   return [val]
 }
 
-const getLabel = (arr: any[], id: any) => arr.find(x => String(x.id) === String(id))?.label || id || ''
-const getLabels = (arr: any[], ids: any[]) => {
-  if (!ids || !Array.isArray(ids) || ids.length === 0) return ''
-  return ids.map(id => getLabel(arr, id)).join(', ')
+const getLabel = (arr: any[], id: any) => {
+  if (id === null || id === undefined) return ''
+  return arr.find(x => String(x.id) === String(id))?.label || id || ''
+}
+const getLabels = (arr: any[], ids: any) => {
+  const finalIds = safeParseJsonArray(ids)
+  if (!finalIds || finalIds.length === 0) return '""'
+  return `"${finalIds.map(id => getLabel(arr, id)).join(', ')}"`
 }
 
 export async function GET(request: Request) {
@@ -41,7 +52,6 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    // Usamos el rol autenticado directamente por seguridad
     const role = auth.decoded?.rol?.toLowerCase() || ''
     const userId = auth.decoded?.userId
     const userInfo = await prisma.user.findUnique({
@@ -61,7 +71,6 @@ export async function GET(request: Request) {
     const isAdmin = role === 'admin'
     const isAuxiliar = role === 'auxiliar'
 
-    // Validación de permisos estricta
     if (!isSuperAdmin && !isAdmin && !isAuxiliar && !isEnfermeria) {
        return NextResponse.json({ error: "No tienes permiso para descargar identificaciones" }, { status: 403 });
     }
@@ -69,7 +78,6 @@ export async function GET(request: Request) {
     let whereClause: any = {}
 
     if (isAuxiliar) {
-      // Las que tengan relacionadas y hayan hecho en ese territorio
       if (territorioId) whereClause.territorioId = territorioId
       if (userId) whereClause.encuestadorId = userId
     } else if (isEnfermeria) {
@@ -83,7 +91,7 @@ export async function GET(request: Request) {
         pacientes: true,
         territorio: true
       },
-      orderBy: { consecutivo: 'asc' }
+      orderBy: { consecutivo: 'desc' } // Punto 3: Orden Cronológico
     })
 
     const headers = [
@@ -109,15 +117,13 @@ export async function GET(request: Request) {
 
     const rows: string[] = []
 
-    // Por cada ficha iteramos sus pacientes para crear la estructura plana
     fichas.forEach(f => {
-      // Datos Base del Hogar
       const baseRowData = [
         cleanCsv(f.id),
         cleanCsv(f.consecutivo),
         cleanCsv(getLabel(ESTADO_VISITA, f.estadoVisita)),
         cleanCsv(f.departamento),
-        cleanCsv('66001'), // Pereira código
+        cleanCsv('66001'),
         cleanCsv(f.municipio),
         cleanCsv(f.territorio?.nombre || 'N/A'),
         cleanCsv(f.microterritorio),
@@ -129,10 +135,9 @@ export async function GET(request: Request) {
         cleanCsv(f.numHogar),
         cleanCsv(f.numFamilia),
         cleanCsv(f.codFicha),
-        cleanCsv(f.latitud),
-        cleanCsv(f.longitud),
+        cleanCsv(f.latitud, true),
+        cleanCsv(f.longitud, true),
         cleanCsv(f.fechaDiligenciamiento ? new Date(f.fechaDiligenciamiento).toISOString().split('T')[0] : ''),
-        // Nombre encuestador: usuario real o datos raw del CSV
         cleanCsv(f.encuestador ? `${f.encuestador.nombre} ${f.encuestador.apellidos}` : ((f as any).encuestadorNombreRaw || '')),
         cleanCsv(f.encuestador?.documento || (f as any).encuestadorDocRaw || ''),
         // VIVIENDA
@@ -144,14 +149,14 @@ export async function GET(request: Request) {
         cleanCsv(f.numDormitorios),
         cleanCsv(f.estratoSocial),
         cleanCsv(f.hacinamiento ? 'SI' : 'NO'),
-        cleanCsv(getLabels(FUENTE_AGUA, f.fuenteAgua)),
-        cleanCsv(getLabels(DISPOSICION_EXCRETAS, f.dispExcretas)),
-        cleanCsv(getLabels(AGUAS_RESIDUALES, f.aguasResiduales)),
-        cleanCsv(getLabels(DISPOSICION_RESIDUOS, f.dispResiduos)),
-        cleanCsv(getLabels(RIESGO_ACCIDENTE, f.riesgoAccidente)),
+        getLabels(FUENTE_AGUA, f.fuenteAgua),
+        getLabels(DISPOSICION_EXCRETAS, f.dispExcretas),
+        getLabels(AGUAS_RESIDUALES, f.aguasResiduales),
+        getLabels(DISPOSICION_RESIDUOS, f.dispResiduos),
+        getLabels(RIESGO_ACCIDENTE, f.riesgoAccidente),
         cleanCsv(getLabel(FUENTE_ENERGIA, f.fuenteEnergia)),
         cleanCsv(f.presenciaVectores ? 'SI' : 'NO'),
-        cleanCsv(getLabels(ANIMALES, f.animales)),
+        getLabels(ANIMALES, f.animales),
         cleanCsv(f.cantAnimales),
         cleanCsv(f.vacunacionMascotas ? 'SI' : 'NO'),
         // FAMILIA
@@ -166,19 +171,14 @@ export async function GET(request: Request) {
         cleanCsv(getLabel(ECOMAPA_OPCIONES, f.ecomapa)),
         cleanCsv(f.cuidadorPrincipal ? 'SI' : 'NO'),
         cleanCsv(getLabel(ZARIT_OPCIONES, f.zarit)),
-        cleanCsv(getLabels(VULNERABILIDADES, f.vulnerabilidades))
+        getLabels(VULNERABILIDADES, f.vulnerabilidades)
       ]
 
       if (!f.pacientes || f.pacientes.length === 0) {
-         // Si no tiene pacientes, añadimos celdas vacías al final
          const emptyPatientCols = Array(35).fill('""');
          rows.push([...baseRowData, ...emptyPatientCols].join(';'))
       } else {
          f.pacientes.forEach(p => {
-            // Helper parsing for JSONs (Prisma already returns objects for Json types)
-            const antcArray = safeParseJsonArray(p.antecedentes);
-            const antcTransArray = safeParseJsonArray(p.antecTransmisibles);
-
             const patientRowData = [
               cleanCsv(p.id),
               cleanCsv(p.nombres),
@@ -190,7 +190,7 @@ export async function GET(request: Request) {
               cleanCsv(p.generoIdentidad),
               cleanCsv(getLabel(PARENTESCO, p.parentesco)),
               cleanCsv(p.gestante),
-              cleanCsv(p.mesesGestacion),
+              cleanCsv(p.mesesGestacion, true),
               cleanCsv(p.telefono),
               cleanCsv(getLabel(NIVEL_EDUCATIVO, p.nivelEducativo)),
               cleanCsv(getLabel(OCUPACION, p.ocupacion)),
@@ -198,23 +198,23 @@ export async function GET(request: Request) {
               cleanCsv(p.eapb),
               cleanCsv(getLabel(ETNIA, p.etnia)),
               cleanCsv(p.puebloIndigena),
-              cleanCsv(getLabels(GRUPO_POBLACIONAL, p.grupoPoblacional)),
-              cleanCsv(getLabels(DISCAPACIDADES, p.discapacidades)),
-              cleanCsv(p.peso),
-              cleanCsv(p.talla),
-              cleanCsv(p.perimetroBraquial),
+              getLabels(GRUPO_POBLACIONAL, p.grupoPoblacional),
+              getLabels(DISCAPACIDADES, p.discapacidades),
+              cleanCsv(p.peso, true),
+              cleanCsv(p.talla, true),
+              cleanCsv(p.perimetroBraquial, true),
               cleanCsv(getLabel(DIAGNOSTICO_NUTRICIONAL, p.diagNutricional)),
               cleanCsv(p.practicaDeportiva ? 'SI' : 'NO'),
               cleanCsv(p.lactanciaMaterna ? 'SI' : 'NO'),
               cleanCsv(p.lactanciaMeses),
               cleanCsv(p.esquemaAtenciones ? 'SI' : 'NO'),
               cleanCsv(p.esquemaVacunacion ? 'SI' : 'NO'),
-              cleanCsv(getLabels(INTERVENCIONES_PENDIENTES, p.intervencionesPendientes)),
+              getLabels(INTERVENCIONES_PENDIENTES, p.intervencionesPendientes),
               cleanCsv(p.enfermedadAguda ? 'SI' : 'NO'),
               cleanCsv(p.recibeAtencionMedica ? 'SI' : 'NO'),
-              cleanCsv(getLabels(REMISIONES_APS, p.remisiones)),
-              cleanCsv(getLabels(ANTECEDENTES_CRONICOS, antcArray)),
-              cleanCsv(getLabels(ANTECEDENTES_TRANSMISIBLES, antcTransArray))
+              getLabels(REMISIONES_APS, p.remisiones),
+              getLabels(ANTECEDENTES_CRONICOS, p.antecedentes),
+              getLabels(ANTECEDENTES_TRANSMISIBLES, p.antecTransmisibles)
             ]
 
             rows.push([...baseRowData, ...patientRowData].join(';'))

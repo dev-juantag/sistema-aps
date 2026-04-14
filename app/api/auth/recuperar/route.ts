@@ -29,6 +29,14 @@ export async function POST(req: Request) {
       )
     }
 
+    // Verificar si el usuario está activo
+    if ((unUsuario as any).activo === false) {
+      return NextResponse.json(
+        { error: "Esta cuenta se encuentra inactiva. Contacte al administrador para habilitar el acceso y procesos de recuperación." },
+        { status: 403 }
+      )
+    }
+
     // Generar código aleatorio de 6 dígitos
     const code = Math.floor(100000 + Math.random() * 900000).toString()
     

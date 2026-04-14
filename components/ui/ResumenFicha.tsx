@@ -1,4 +1,4 @@
-import { ArrowLeft, Printer, MapPin, Info, Home, Users, Activity, Stethoscope, FileText, Network, Edit } from 'lucide-react'
+import { ArrowLeft, Printer, MapPin, Info, Home, Users, Activity, Stethoscope, FileText, Network, Edit, Phone } from 'lucide-react'
 import { ESTADO_VISITA, APGAR_OPCIONES, calcularEdad } from '@/lib/constants'
 import FamiliogramaViewer from './FamiliogramaViewer'
 
@@ -334,14 +334,25 @@ export default function ResumenFicha({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 sm:gap-6 self-start sm:self-auto border-t sm:border-0 border-gray-100 pt-3 sm:pt-0">
-                        <div>
-                          <p className="text-[9px] font-black text-gray-400 tracking-widest uppercase text-left sm:text-right">Género</p>
-                          <p className="font-bold text-sm text-gray-800 capitalize leading-tight">{pac.sexo?.toLowerCase() || 'N/A'}</p>
-                        </div>
-                        <div className="bg-white border text-center border-gray-200 rounded-lg px-4 py-1.5 shadow-sm">
-                          <p className="text-[9px] font-black text-gray-400 tracking-widest uppercase">Régimen</p>
-                          <p className="font-black text-sm text-gray-800 uppercase leading-tight">{pac.regimen || 'N/A'}</p>
+                      <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 self-start sm:self-auto border-t sm:border-0 border-gray-100 pt-3 sm:pt-0">
+                        {pac.telefono && calcularEdad(pac.fechaNacimiento) >= 16 && (
+                          <a 
+                            href={`tel:${pac.telefono}`} 
+                            className="flex items-center justify-center p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg transition-colors shadow-sm shrink-0"
+                            title={`Llamar al ${pac.telefono}`}
+                          >
+                            <Phone className="w-4 h-4" />
+                          </a>
+                        )}
+                        <div className="flex gap-3 sm:gap-6 w-full sm:w-auto justify-between sm:justify-start">
+                          <div>
+                            <p className="text-[9px] font-black text-gray-400 tracking-widest uppercase text-left sm:text-right">Género</p>
+                            <p className="font-bold text-sm text-gray-800 capitalize leading-tight">{pac.sexo?.toLowerCase() || 'N/A'}</p>
+                          </div>
+                          <div className="bg-white border text-center border-gray-200 rounded-lg px-4 py-1.5 shadow-sm">
+                            <p className="text-[9px] font-black text-gray-400 tracking-widest uppercase">Régimen</p>
+                            <p className="font-black text-sm text-gray-800 uppercase leading-tight">{pac.regimen || 'N/A'}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -383,7 +394,7 @@ export default function ResumenFicha({
         )}
 
         {/* FAMILIOGRAMA AUTO-GENERADO o PERSONALIZADO */}
-        {ficha.estadoVisita === '1' && canManageFamiliograma && (
+        {ficha.estadoVisita === '1' && (canManageFamiliograma || ficha.familiogramaCodigo) && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
@@ -395,13 +406,15 @@ export default function ResumenFicha({
                   <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Representación Familiar</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setShowFamiliograma(true)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-[#0a8c32] text-white text-sm font-bold rounded-lg hover:bg-[#086a25] transition-colors shadow-sm"
-              >
-                <Activity className="w-4 h-4" />
-                ABRIR EDITOR LITERAL / CANVAS
-              </button>
+              {canManageFamiliograma && (
+                <button 
+                  onClick={() => setShowFamiliograma(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-[#0a8c32] text-white text-sm font-bold rounded-lg hover:bg-[#086a25] transition-colors shadow-sm"
+                >
+                  <Activity className="w-4 h-4" />
+                  ABRIR EDITOR LITERAL / CANVAS
+                </button>
+              )}
             </div>
             
             {ficha.familiogramaCodigo && !String(ficha.familiogramaCodigo).startsWith('{') ? (

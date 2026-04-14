@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import useSWR from "swr"
 import { fetcher } from "@/lib/fetcher"
 import { useAuth } from "@/lib/auth-context"
@@ -11,6 +11,8 @@ import {
 import { IdentificacionesWizard } from "./identificaciones-wizard"
 import FacturaFicha from "@/components/ui/FacturaFicha"
 import ResumenFicha from "@/components/ui/ResumenFicha"
+import { toast } from "sonner"
+import ConfirmModal from "@/components/ui/ConfirmModal"
 
 export function IdentificacionesModule() {
   const { user, isSuperAdmin, isAdmin } = useAuth()
@@ -21,7 +23,9 @@ export function IdentificacionesModule() {
   const [page, setPage] = useState(1)
   const limit = 50
 
-  const apiUrl = user ? `/api/identificaciones?role=${user.rol}&territorioId=${user.territorioId || ''}&page=${page}&limit=${limit}${activeSearch ? `&search=${encodeURIComponent(activeSearch)}` : ''}` : null
+  const [myIdentifications, setMyIdentifications] = useState(false)
+  
+  const apiUrl = user ? `/api/identificaciones?role=${user.rol}&territorioId=${user.territorioId || ''}&page=${page}&limit=${limit}${activeSearch ? `&search=${encodeURIComponent(activeSearch)}` : ''}${myIdentifications ? '&myOnly=true' : ''}` : null
   const { data: rawFichas, isLoading: loading, mutate: mutateFichas } = useSWR<any>(apiUrl, fetcher)
   
   const { data: rawProgramas } = useSWR<any>("/api/programas", fetcher)
@@ -55,6 +59,21 @@ export function IdentificacionesModule() {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importStatus, setImportStatus] = useState<{success?: string, error?: string, errors?: string[]} | null>(null)
 
+  const [showNewIdConfirm, setShowNewIdConfirm] = useState(false)
+  const [deleteConfirmFicha, setDeleteConfirmFicha] = useState<{id: string, consecutivo: number} | null>(null)
+  
+  // Mostrar aviso de vacío
+  const [notifiedEmpty, setNotifiedEmpty] = useState(false)
+  
+  useEffect(() => {
+    if (!loading && fichasData && fichasData.length === 0 && !notifiedEmpty && !activeSearch) {
+      if (user?.rol === 'auxiliar') {
+        toast.warning("Aviso: No tienes identificaciones registradas en este territorio.", { duration: 5000 })
+      }
+      setNotifiedEmpty(true)
+    }
+  }, [loading, fichasData, notifiedEmpty, activeSearch, user?.rol])
+
   // Filtros visuales adicionales
   const [qHogar, setQHogar] = useState("")
   const [qEstado, setQEstado] = useState("")
@@ -80,19 +99,26 @@ export function IdentificacionesModule() {
   // To avoid circular or frequent updates, we don't automatically reset page here, 
   // but it's something to consider for future advanced search.
 
-  const handleDeleteFicha = async (id: string, consecutivo: number) => {
-    if (!confirm(`PELIGRO: ¿Estás totalmente seguro de eliminar todo el registro de la Ficha #${consecutivo}? Esto borrará también a la familia e integrantes de forma irreversible.`)) return
-    
+  const handleDeleteFicha = (id: string, consecutivo: number) => {
+    setDeleteConfirmFicha({ id, consecutivo })
+  }
+
+  const executeDeleteFicha = async () => {
+    if (!deleteConfirmFicha) return
+    const { id, consecutivo } = deleteConfirmFicha
+    setDeleteConfirmFicha(null)
+    const toastId = toast.loading(`Eliminando ficha #${consecutivo}...`)
     try {
       const resp = await fetch(`/api/identificaciones/${id}`, { method: 'DELETE' })
       if (!resp.ok) {
         const d = await resp.json()
-        alert(d.error || 'Error eliminando Ficha')
+        toast.error(d.error || 'Error eliminando Ficha', { id: toastId })
         return
       }
+      toast.success("Ficha eliminada correctamente", { id: toastId })
       mutateFichas()
     } catch (e: any) {
-      alert(e.message)
+      toast.error(e.message, { id: toastId })
     }
   }
 
@@ -105,7 +131,7 @@ export function IdentificacionesModule() {
       const data = await res.json()
       setSelectedFichaDetail(data)
     } catch (e: any) {
-      alert(e.message)
+      toast.error(e.message)
       setShowDetailModal(false)
     } finally {
       setLoadingDetail(false)
@@ -114,6 +140,7 @@ export function IdentificacionesModule() {
 
   const handleExport = async () => {
     setExporting(true)
+    const toastId = toast.loading("Preparando exportación...")
     try {
       const exportUrl = user ? `/api/identificaciones/exportar?role=${user.rol}&territorioId=${user.territorioId || ''}&userId=${user.id || ''}` : '/api/identificaciones/exportar'
       
@@ -134,8 +161,9 @@ export function IdentificacionesModule() {
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
+      toast.success("Exportación descargada", { id: toastId })
     } catch (e: any) {
-      alert(e.message)
+      toast.error(e.message, { id: toastId })
     } finally {
       setExporting(false)
     }
@@ -249,7 +277,7 @@ export function IdentificacionesModule() {
                Importar CSV
              </button>
           )}
-          {(isSuperAdmin || isAdmin || isAuxiliar || isEnfermeria()) && (
+          {(isSuperAdmin || isAdmin || isEnfermeria()) && (
             <button
               disabled={exporting}
               onClick={handleExport}
@@ -264,11 +292,11 @@ export function IdentificacionesModule() {
           </div>
           {(isAuxiliar || isSuperAdmin) && (
             <button
-              onClick={() => setIsWizardOpen(true)}
+              onClick={() => setShowNewIdConfirm(true)}
               className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer shadow-sm hover:shadow-md w-full sm:w-auto text-center whitespace-nowrap"
             >
               <Plus className="h-4 w-4" />
-              Nueva ID
+              Nueva identificación
             </button>
           )}
         </div>
@@ -320,6 +348,20 @@ export function IdentificacionesModule() {
             <option value="2">No Efectivas</option>
             <option value="3">Rechazadas / Negadas</option>
           </select>
+
+          {isAuxiliar && (
+            <button
+              onClick={() => { setMyIdentifications(!myIdentifications); setPage(1); }}
+              className={`px-4 py-2.5 rounded-xl text-sm font-bold border transition-all flex items-center gap-2 ${
+                myIdentifications 
+                  ? 'bg-primary text-primary-foreground border-primary shadow-sm' 
+                  : 'bg-background text-foreground border-border hover:bg-muted'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Mis Identificaciones
+            </button>
+          )}
         </div>
 
         {/* CONTENIDO TABULAR */}
@@ -328,9 +370,16 @@ export function IdentificacionesModule() {
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : filteredFichas.length === 0 ? (
-          <div className="h-48 flex flex-col justify-center items-center text-muted-foreground text-sm">
-            <ShieldAlert className="w-8 h-8 mb-2 opacity-30" />
-            No existen fichas registradas bajo tu perfil territorial
+          <div className="h-48 flex flex-col justify-center items-center text-muted-foreground text-sm p-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <ShieldAlert className="w-10 h-10 mb-4 opacity-40 text-orange-500" />
+            <p className="font-black text-lg text-foreground mb-1 tracking-tight">
+              {myIdentifications ? "Aún no has creado identificaciones" : "No existen fichas registradas"}
+            </p>
+            <p className="max-w-md text-muted-foreground font-medium">
+              {myIdentifications 
+                ? "Bajo tu usuario no se registran fichas en este territorio. ¡Haz clic en el botón superior para comenzar la primera!"
+                : "No se encontraron resultados disponibles para los filtros aplicados bajo este perfil de acceso."}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto w-full">
@@ -526,7 +575,7 @@ export function IdentificacionesModule() {
                     />
                   </div>
                   {/* Elemento reservado SÓLO para el momento crítico de imprimir */}
-                  <div className="hidden print:block w-full h-auto bg-white overflow-visible">
+                  <div className="fixed top-[-9999px] left-[-9999px] print:static print:top-auto print:left-auto print:block w-[1024px] print:w-full bg-white overflow-visible">
                     <FacturaFicha ficha={selectedFichaDetail} showOnScreen={false} />
                   </div>
                 </>
@@ -547,6 +596,46 @@ export function IdentificacionesModule() {
       )}
 
       {/* Import Modal */}
+      {/* MODAL CONFIRMACIÓN NUEVA IDENTIFICACIÓN */}
+      {showNewIdConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="w-full max-w-md rounded-[2.5rem] bg-white p-8 shadow-2xl animate-in zoom-in-95 duration-300 border-none">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-3xl flex items-center justify-center mb-6 border border-orange-100 shadow-inner">
+                <ShieldAlert className="w-10 h-10" />
+              </div>
+              
+              <h2 className="text-3xl font-black text-orange-600 mb-4 tracking-tight">
+                Nueva Identificación
+              </h2>
+              
+              <p className="text-slate-600 font-medium text-lg leading-relaxed mb-10 px-4">
+                ¿Estás seguro de que deseas iniciar una nueva identificación para este territorio? 
+                <span className="block mt-2 text-slate-400 text-sm">Asegúrate de que el hogar no haya sido identificado anteriormente.</span>
+              </p>
+
+              <div className="grid grid-cols-2 gap-4 w-full">
+                <button
+                  onClick={() => setShowNewIdConfirm(false)}
+                  className="rounded-2xl border-2 border-slate-100 bg-white px-6 py-4 text-lg font-black text-slate-500 hover:bg-slate-50 hover:border-slate-200 transition-all cursor-pointer active:scale-95"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowNewIdConfirm(false)
+                    setIsWizardOpen(true)
+                  }}
+                  className="rounded-2xl bg-orange-500 px-6 py-4 text-lg font-black text-white hover:bg-orange-600 shadow-lg shadow-orange-500/20 transition-all cursor-pointer active:scale-95"
+                >
+                  Sí, iniciar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showImportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg">
@@ -610,6 +699,20 @@ export function IdentificacionesModule() {
           </div>
         </div>
       )}
+      
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        open={!!deleteConfirmFicha}
+        title="Eliminar Ficha"
+        message={`PELIGRO: ¿Estás totalmente seguro de eliminar todo el registro de la Ficha #${deleteConfirmFicha?.consecutivo}? Esto borrará también a la familia e integrantes de forma irreversible.`}
+        confirmLabel="Sí, eliminar"
+        cancelLabel="Cancelar"
+        danger={true}
+        onConfirm={() => {
+          if (deleteConfirmFicha) executeDeleteFicha()
+        }}
+        onCancel={() => setDeleteConfirmFicha(null)}
+      />
     </div>
   )
 }

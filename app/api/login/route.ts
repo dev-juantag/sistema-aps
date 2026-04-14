@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // --- LOGICA DE INACTIVIDAD (3 MESES) ---
+    // --- LOGICA DE INACTIVIDAD (1 MES) ---
     // El usuario se considera activo si la bandera es explícitamente true o si no existe (null/undefined en BDs antiguas; Prisma por defecto usa true).
     let isActivo = (user as any).activo !== false;
 
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       const fechaBase = (user as any).lastLogin ? new Date((user as any).lastLogin) : new Date(user.createdAt);
       
       const limiteInactividad = new Date();
-      limiteInactividad.setMonth(limiteInactividad.getMonth() - 3);
+      limiteInactividad.setMonth(limiteInactividad.getMonth() - 1);
 
       if (fechaBase < limiteInactividad) {
         isActivo = false;

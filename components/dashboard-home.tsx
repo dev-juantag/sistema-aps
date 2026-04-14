@@ -97,6 +97,8 @@ export function DashboardHome() {
   const { data: usuariosData, error: errUs } = useSWR(user && isAdmin ? "/api/users" : null, fetcher, swrOptions)
   const { data: programasData, error: errPr } = useSWR(user ? "/api/programas" : null, fetcher, swrOptions)
   const { data: stageData, error: errSt } = useSWR(user ? "/api/settings/stage" : null, fetcher, swrOptions)
+  const { data: topProfsData } = useSWR(user ? "/api/atenciones/top-profesionales" : null, fetcher, swrOptions)
+  const { data: derivPendientesData } = useSWR(user ? "/api/derivaciones/pendientes" : null, fetcher, swrOptions)
   
   const programas = useMemo(() => Array.isArray(programasData) ? programasData : [], [programasData])
   
@@ -237,6 +239,27 @@ export function DashboardHome() {
     }))
   }, [indentificaciones])
 
+  // Nuevo gráfico: Productividad diaria (Últimos 14 días)
+  const chartDataMisAtencionesDiarias = useMemo(() => {
+    const data = [];
+    const now = new Date();
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const count = misAtenciones.filter((a: any) => (a.createdAtISO || a.fecha).startsWith(dateStr)).length;
+      
+      // Formatear fecha para el eje X (ej: "14 Abr")
+      const label = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+      data.push({
+        nombre: label,
+        atenciones: count,
+        fechaCompleta: dateStr
+      });
+    }
+    return data;
+  }, [misAtenciones])
+
   const recentIdentificaciones = useMemo(() => {
     return [...indentificaciones].slice(0, 5)
   }, [indentificaciones])
@@ -251,6 +274,10 @@ export function DashboardHome() {
 
   // Top Profesionales
   const top10Profesionales = useMemo(() => {
+    if (Array.isArray(topProfsData) && topProfsData.length > 0) {
+      return topProfsData;
+    }
+
     if (!usuarios.length) return [];
     const profs = usuarios.filter((u: any) => u.rol === "profesional" && u.activo !== false);
     
@@ -271,7 +298,10 @@ export function DashboardHome() {
     });
 
     return counts.slice(0, TOP_N_PROFESIONALES);
-  }, [usuarios, filteredAtenciones, user, programas]);
+  }, [usuarios, filteredAtenciones, user, programas, topProfsData]);
+
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  const misAtencionesMes = useMemo(() => misAtenciones.filter((a: any) => (a.createdAtISO || a.fecha).startsWith(currentMonthStr)), [misAtenciones, currentMonthStr]);
 
   const getKpis = () => {
     if (user?.rol === "auxiliar") {
@@ -306,7 +336,7 @@ export function DashboardHome() {
     if (isEnfermeraJefe) {
       return [
         {
-          label: "Id. en Territorio",
+          label: "Identificaciones en Territorio",
           value: idStats?.kpis?.totalFichas || 0,
           icon: <Database className="h-5 w-5" />,
           color: "bg-chart-2/10 text-chart-2",
@@ -364,7 +394,7 @@ export function DashboardHome() {
     if (isAdmin) {
       return [
         {
-          label: "Total Hogares",
+          label: "Total Hogares (Efec.)",
           value: idStats?.kpis?.totalFichas || 0,
           icon: <Home className="h-5 w-5" />,
           color: "bg-blue-100 text-blue-600",
@@ -382,15 +412,15 @@ export function DashboardHome() {
           color: "bg-primary/10 text-primary",
         },
         {
-          label: "Profesionales Activos",
-          value: profesionalesActivos,
-          icon: <Stethoscope className="h-5 w-5" />,
-          color: "bg-emerald-100 text-emerald-600",
+          label: "Sin Aseguramiento",
+          value: idStats?.kpis?.sinAseguramiento || 0,
+          icon: <ShieldAlert className="h-5 w-5" />,
+          color: "bg-orange-100 text-orange-600",
         },
         {
-          label: "Pendientes Facturar",
-          value: filteredAtenciones.filter((a: any) => a.estadoFacturacion === "PENDIENTE").length,
-          icon: <Database className="h-5 w-5" />,
+          label: "Remisiones APS",
+          value: idStats?.kpis?.remitidos || 0,
+          icon: <Activity className="h-5 w-5" />,
           color: "bg-rose-100 text-rose-600",
         },
       ]
@@ -398,14 +428,20 @@ export function DashboardHome() {
 
     return [
       {
+        label: "Mi Programa",
+        value: programas.find((p: any) => p.id === user?.programaId)?.nombre || "N/A",
+        icon: <Briefcase className="h-5 w-5" />,
+        color: "bg-indigo-100 text-indigo-600",
+      },
+      {
         label: "Mis atenciones",
         value: misAtenciones.length,
         icon: <ClipboardList className="h-5 w-5" />,
         color: "bg-primary/10 text-primary",
       },
       {
-        label: "Atenciones Hoy",
-        value: todayAtenciones.length,
+        label: "Mis atenciones (Mes)",
+        value: misAtencionesMes.length,
         icon: <Calendar className="h-5 w-5" />,
         color: "bg-chart-3/10 text-chart-3",
       },
@@ -414,6 +450,30 @@ export function DashboardHome() {
         value: misAtenciones.filter((a: any) => a.fecha.startsWith(today)).length,
         icon: <TrendingUp className="h-5 w-5" />,
         color: "bg-chart-4/10 text-chart-4",
+      },
+      {
+        label: "Hombres Atendidos",
+        value: misAtenciones.filter((a: any) => String(a.pacienteGenero).toUpperCase() === "HOMBRE").length,
+        icon: <Users className="h-5 w-5" />,
+        color: "bg-blue-100 text-blue-600",
+      },
+      {
+        label: "Mujeres Atendidas",
+        value: misAtenciones.filter((a: any) => String(a.pacienteGenero).toUpperCase() === "MUJER").length,
+        icon: <Users className="h-5 w-5" />,
+        color: "bg-rose-100 text-rose-600",
+      },
+      {
+        label: "Derivaciones Pendien.",
+        value: derivPendientesData?.count || 0,
+        icon: <AlertTriangle className="h-5 w-5" />,
+        color: "bg-yellow-100 text-yellow-600",
+      },
+      {
+        label: "Atenciones Facturadas",
+        value: misAtenciones.filter((a: any) => a.estadoFacturacion === "FACTURADA" || a.estadoFacturacion === "EVOLUCIONADA_SAFIX").length,
+        icon: <CheckCircle2 className="h-5 w-5" />,
+        color: "bg-green-100 text-green-600",
       }
     ]
   }
@@ -484,8 +544,8 @@ export function DashboardHome() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
               <Baby className="mx-auto h-8 w-8 text-chart-2 mb-2" />
-              <p className="text-3xl font-bold text-foreground">{idStats?.kpis?.menores5 || 0}</p>
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Primera Infancia</p>
+              <p className="text-3xl font-bold text-foreground">{idStats?.kpis?.menores10 || 0}</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Niños &lt; 10 años</p>
             </div>
             <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
               <Activity className="mx-auto h-8 w-8 text-destructive mb-2" />
@@ -495,7 +555,7 @@ export function DashboardHome() {
             <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
               <AlertTriangle className="mx-auto h-8 w-8 text-orange-500 mb-2" />
               <p className="text-3xl font-bold text-foreground">{idStats?.kpis?.signosDesnutricion || 0}</p>
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Riesgo Nutricional</p>
+              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Desnutrición</p>
             </div>
             <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-5 shadow-sm text-center">
               <Users className="mx-auto h-8 w-8 text-chart-4 mb-2" />
@@ -564,8 +624,14 @@ export function DashboardHome() {
                   </h2>
                 </div>
                 <div className="flex items-center gap-3 text-[11px]">
-                   <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[#081e69]"></div>Hom.</div>
-                   <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-[#eb3b5a]"></div>Muj.</div>
+                   <div className="flex items-center gap-1">
+                     <div className="w-2 h-2 rounded-full bg-[#081e69]"></div>
+                     <span className="font-bold">HOMBRES: {idStats?.kpis?.totalHombres || 0}</span>
+                   </div>
+                   <div className="flex items-center gap-1">
+                     <div className="w-2 h-2 rounded-full bg-[#eb3b5a]"></div>
+                     <span className="font-bold">MUJERES: {idStats?.kpis?.totalMujeres || 0}</span>
+                   </div>
                 </div>
               </div>
               <div className="w-full h-[300px]">
@@ -644,10 +710,18 @@ export function DashboardHome() {
           <div className="mb-4 flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold text-foreground">
-              {isFacturador ? "Distribución por Estado de Facturación" : user?.rol === "auxiliar" || isEnfermeraJefe ? "Estado de Identificaciones del Territorio" : "Todas las Atenciones por Programa"}
+              {isFacturador 
+                ? "Distribución por Estado de Facturación" 
+                : user?.rol === "auxiliar" || isEnfermeraJefe 
+                  ? "Estado de Identificaciones del Territorio" 
+                  : "Mi Productividad Semanal (Atenciones)"}
             </h2>
           </div>
-          {(isFacturador ? chartDataFacturacion : (user?.rol === "auxiliar" || isEnfermeraJefe ? chartDataIdAuxiliar : chartDataAtenciones)).length === 0 ? (
+          {(isFacturador 
+            ? chartDataFacturacion 
+            : (user?.rol === "auxiliar" || isEnfermeraJefe 
+                ? chartDataIdAuxiliar 
+                : chartDataMisAtencionesDiarias)).length === 0 ? (
             <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
               No hay datos para mostrar.
             </div>
@@ -677,7 +751,7 @@ export function DashboardHome() {
           ) : (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={user?.rol === "auxiliar" || isEnfermeraJefe ? chartDataIdAuxiliar : chartDataAtenciones} margin={{ top: 5, right: 10, left: -20, bottom: 40 }}>
+                <BarChart data={user?.rol === "auxiliar" || isEnfermeraJefe ? chartDataIdAuxiliar : chartDataMisAtencionesDiarias} margin={{ top: 5, right: 10, left: -20, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.90 0.02 285)" />
                   <XAxis
                     dataKey="nombre"
@@ -696,7 +770,12 @@ export function DashboardHome() {
                       fontSize: "13px",
                     }}
                   />
-                  <Bar dataKey={user?.rol === "auxiliar" || isEnfermeraJefe ? "cantidad" : "atenciones"} name={user?.rol === "auxiliar" || isEnfermeraJefe ? "Cantidad" : "Atenciones"} fill="oklch(0.50 0.18 285)" radius={[4, 4, 0, 0]} />
+                  <Bar 
+                    dataKey={user?.rol === "auxiliar" || isEnfermeraJefe ? "cantidad" : "atenciones"} 
+                    name={user?.rol === "auxiliar" || isEnfermeraJefe ? "Cantidad" : "Atenciones"} 
+                    fill={user?.rol === "auxiliar" ? "oklch(0.50 0.18 285)" : "oklch(0.60 0.2 150)"} 
+                    radius={[4, 4, 0, 0]} 
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>

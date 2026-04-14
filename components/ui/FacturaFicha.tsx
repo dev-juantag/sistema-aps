@@ -2,7 +2,8 @@ import {
   ESTADO_VISITA, TIPO_VIVIENDA, MATERIAL_PAREDES, MATERIAL_PISOS, MATERIAL_TECHOS,
   FUENTE_AGUA, DISPOSICION_EXCRETAS, AGUAS_RESIDUALES, DISPOSICION_RESIDUOS, RIESGO_ACCIDENTE,
   FUENTE_ENERGIA, ANIMALES, TIPO_FAMILIA, APGAR_OPCIONES, ZARIT_OPCIONES, ECOMAPA_OPCIONES,
-  VULNERABILIDADES, DIAGNOSTICO_NUTRICIONAL, PARENTESCO, REGIMEN_SALUD, OCUPACION
+  VULNERABILIDADES, DIAGNOSTICO_NUTRICIONAL, PARENTESCO, REGIMEN_SALUD, OCUPACION,
+  APGAR_PREGUNTAS
 } from '@/lib/constants'
 import FamiliogramaViewer from './FamiliogramaViewer'
 import FamiliogramaStaticViewer from './FamiliogramaStaticViewer'
@@ -43,21 +44,21 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
   const thCls = "font-bold text-sm w-1/3 py-1.5 align-top uppercase border-b border-gray-300"
   const tdCls = "text-sm py-1.5 align-top border-b border-gray-200"
 
-  const Th = ({ children, className }: { children: React.ReactNode, className?: string }) => <th className={`${thCls} ${className || ''}`}>{children}</th>
-  const Td = ({ children, className }: { children: React.ReactNode, className?: string }) => <td className={`${tdCls} ${className || ''}`}>{children}</td>
+  const Th = ({ children, className, style }: { children: React.ReactNode, className?: string, style?: React.CSSProperties }) => <th className={`${thCls} ${className || ''}`} style={style}>{children}</th>
+  const Td = ({ children, className, style }: { children: React.ReactNode, className?: string, style?: React.CSSProperties }) => <td className={`${tdCls} ${className || ''}`} style={style}>{children}</td>
 
   return (
     <div className={`${showOnScreen ? 'block' : 'absolute w-[1024px] h-[500px] overflow-hidden -z-50 opacity-0 pointer-events-none print:static print:w-full print:h-auto print:opacity-100 print:overflow-visible print:pointer-events-auto'} font-sans text-black bg-white max-w-none mx-auto p-4 md:p-8 leading-normal print:p-0`}>
       
       {/* HEADER GLOBAL */}
       <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: '4px solid black' }}>
-        <img src="/logo-gobernacion-risaralda.png" alt="Logo 1" className="w-24 h-24 border border-gray-50 bg-gray-50 shrink-0" />
+        <img src="/logo-gobernacion-risaralda.png" alt="Logo Gobernación" className="w-24 h-24 shrink-0 object-contain" />
         <div className="text-center px-4 flex-1">
           <h1 className="font-black text-3xl uppercase tracking-widest">Identificación APS</h1>
           <p className="font-bold text-lg mt-2 tracking-widest text-gray-600">FICHA OFICIAL NO. {ficha.consecutivo || ficha.id?.substring(0,8)}</p>
           <p className="mt-1 font-sans text-sm text-gray-500">Documento impreso el {new Date().toLocaleString('es-CO')}</p>
         </div>
-        <img src="/logo-gobernacion-risaralda.png" alt="Logo 2" className="w-24 h-24 border border-gray-50 bg-gray-50 shrink-0" />
+        <img src="/icono-ese-salud-pereira.png" alt="Logo ESE Salud Pereira" className="w-24 h-24 shrink-0 object-contain" />
       </div>
 
       {/* CASO A: FICHA RECHAZADA O NO EFECTIVA (VERSIÓN CORTA) */}
@@ -179,7 +180,40 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
             <h2 className={headerCls}>7. Funcionamiento Familiar (Apgar)</h2>
             <table className={tblCls}>
               <tbody>
-                <tr><Th>Nivel de satisfacción (Apgar)</Th><Td className="font-bold">{getLabel(APGAR_OPCIONES, ficha.apgar)}</Td></tr>
+                {APGAR_PREGUNTAS.map((pregunta: string, idx: number) => {
+                  const valorRespuesta = ficha.apgarRespuestas ? ficha.apgarRespuestas[idx] : null;
+                  const APGAR_VALORES = ['Nunca (0)', 'Casi nunca (1)', 'A veces (2)', 'Casi siempre (3)', 'Siempre (4)'];
+                  const textoRespuesta = valorRespuesta != null ? APGAR_VALORES[valorRespuesta] : 'No respondido';
+                  return (
+                    <tr key={idx}>
+                      <Th className="font-medium text-xs">{pregunta}</Th>
+                      <Td className="font-bold text-xs">{textoRespuesta}</Td>
+                    </tr>
+                  )
+                })}
+                <tr className="bg-gray-100 italic">
+                  <Th className="font-black">Nivel de satisfacción (Apgar Global)</Th>
+                  <Td className="font-black" style={{ fontSize: '1.2rem' }}>
+                    {(() => {
+                      let cat = getLabel(APGAR_OPCIONES, ficha.apgar).split(' (')[0];
+                      let pts = '?';
+                      if (ficha.apgarRespuestas && Array.isArray(ficha.apgarRespuestas)) {
+                        const valid = ficha.apgarRespuestas.filter((v:any) => v !== null && v !== undefined);
+                        if (valid.length > 0) {
+                          const score = ficha.apgarRespuestas.reduce((a: number,b: number) => a + (b || 0), 0);
+                          pts = score.toString();
+                          if (score >= 17) cat = 'Normal';
+                          else if (score >= 13) cat = 'Disfunción leve';
+                          else if (score >= 10) cat = 'Disfunción moderada';
+                          else cat = 'Disfunción severa';
+                        } else {
+                          cat = 'Sin respuesta / Manual';
+                        }
+                      }
+                      return `${cat} - Puntaje Final: ${pts} / 20`;
+                    })()}
+                  </Td>
+                </tr>
               </tbody>
             </table>
 
@@ -204,11 +238,11 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
             {ficha.familiogramaCodigo && (
               <div className="mt-8 mb-6 print:break-inside-avoid">
                 <h2 className={headerCls}>9. Familiograma Clínico</h2>
-                <div className="border border-slate-300 rounded overflow-hidden">
+                <div className="border border-slate-300 rounded overflow-hidden min-h-[500px] h-[500px] relative">
                   {!String(ficha.familiogramaCodigo).startsWith('{') ? (
                     <FamiliogramaViewer code={ficha.familiogramaCodigo} />
                   ) : (
-                    <FamiliogramaStaticViewer jsonString={ficha.familiogramaCodigo} />
+                    <FamiliogramaStaticViewer jsonString={ficha.familiogramaCodigo} isPrintView={true} />
                   )}
                 </div>
               </div>

@@ -37,6 +37,8 @@ import {
   Activity
 } from "lucide-react"
 import { useEffect } from "react"
+import { toast } from "sonner"
+import ConfirmModal from "@/components/ui/ConfirmModal"
 
 export function EstadoFacturacionBadge({ estado }: { estado?: string }) {
   if (!estado) return <span className="text-muted-foreground">-</span>
@@ -85,6 +87,7 @@ export function AtencionesModule() {
   const [importing, setImporting] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importStatus, setImportStatus] = useState<{success?: string, error?: string} | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const atencionesUrl = (isAdmin || isFacturador) ? "/api/atenciones" : (user ? `/api/atenciones?profesionalId=${user.id}` : null)
   const { data: atencionesData, error: errAt, mutate: mutateAtenciones } = useSWR(atencionesUrl, fetcher)
@@ -102,9 +105,16 @@ export function AtencionesModule() {
     return prog ? prog.nombre.toLowerCase().includes('enfermer') : false;
   }
   
-  // Exponemos la función de mutate para cuando se crea o elimina un registro
-  const triggerRefresh = () => {
-    mutateAtenciones()
+  // Exponemos la función de mutate para cuando se crea o elimina un registro o para optimistic UI
+  const triggerRefresh = (optimisticAtencion?: Partial<Atencion>) => {
+    if (optimisticAtencion) {
+      mutateAtenciones((currentData: any) => {
+        if (!Array.isArray(currentData)) return currentData;
+        return currentData.map(a => a.id === optimisticAtencion.id ? { ...a, ...optimisticAtencion } : a);
+      }, { revalidate: true });
+    } else {
+      mutateAtenciones()
+    }
   }
 
   const filtered = useMemo(() => {
@@ -157,7 +167,12 @@ export function AtencionesModule() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Está seguro de que desea eliminar esta atención? Esta acción no se puede deshacer.")) return;
+    setDeleteConfirmId(id);
+  }
+
+  const executeDelete = async (id: string) => {
+    setDeleteConfirmId(null);
+    const toastId = toast.loading("Eliminando atención...");
     try {
       const token = localStorage.getItem("salud-pereira-token")
       const res = await fetch(`/api/atenciones/${id}`, { 
@@ -166,13 +181,14 @@ export function AtencionesModule() {
       });
       if (res.ok) {
         triggerRefresh()
+        toast.success("Atención eliminada correctamente", { id: toastId });
       } else {
         const error = await res.json();
-        alert(error.error || "Error al eliminar la atención");
+        toast.error(error.error || "Error al eliminar la atención", { id: toastId });
       }
     } catch (e) {
       console.error(e);
-      alert("Error al eliminar la atención");
+      toast.error("Error al eliminar la atención", { id: toastId });
     }
   }
 
@@ -209,7 +225,7 @@ export function AtencionesModule() {
     }
 
     if (toExport.length === 0) {
-      alert("No hay atenciones para exportar en el rango seleccionado");
+      toast.warning("No hay atenciones para exportar en el rango seleccionado");
       return;
     }
 
@@ -728,6 +744,20 @@ export function AtencionesModule() {
           </div>
         </div>
       )}
+      
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        open={!!deleteConfirmId}
+        title="Eliminar Atención"
+        message="¿Está seguro de que desea eliminar esta atención? Esta acción no se puede deshacer y borrará los datos asociados."
+        confirmLabel="Sí, eliminar"
+        cancelLabel="Cancelar"
+        danger={true}
+        onConfirm={() => {
+          if (deleteConfirmId) executeDelete(deleteConfirmId)
+        }}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
     </div>
   )
 }
@@ -932,13 +962,15 @@ function AtencionForm({
       })
 
       if (res.ok) {
+        toast.success("Atención registrada con éxito")
         onCreated()
       } else {
         const err = await res.json()
-        alert(err.error || "Error al crear la atención")
+        toast.error(err.error || "Error al crear la atención")
       }
     } catch (e) {
       console.error(e)
+      toast.error("Error de red al crear la atención")
     } finally {
       setIsSubmitting(false)
     }
@@ -1226,7 +1258,7 @@ function AtencionDetail({
   programas: {id: string, nombre: string}[]
   onBack: () => void
   user: any
-  triggerRefresh: () => void
+  triggerRefresh: (optimisticData?: Partial<Atencion>) => void
 }) {
   const programaNombre = programas.find((p) => p.id === atencion.programaId)?.nombre || "Desconocido"
   
@@ -1234,13 +1266,21 @@ function AtencionDetail({
   const [localEstado, setLocalEstado] = useState(atencion.estadoFacturacion || "PENDIENTE")
   const [localObservacion, setLocalObservacion] = useState(atencion.observacionFacturacion || "")
 
-  const canManageFacturacion = 
-    user?.rol === 'ADMIN' || 
-    user?.rol === 'admin' ||
-    user?.rol === 'SUPERADMIN' || 
-    user?.rol === 'superadmin' ||
-    user?.rol === 'FACTURADOR' || 
-    user?.rol === 'facturador'
+  const isSuperAdminOrAdmin = user?.rol?.toUpperCase() === 'SUPERADMIN' || user?.rol?.toUpperCase() === 'ADMIN'
+  const isFacturador = user?.rol?.toUpperCase() === 'FACTURADOR'
+  const isProfesional = user?.rol?.toUpperCase() === 'PROFESIONAL'
+
+  const isEvolucionada = atencion.estadoFacturacion === 'EVOLUCIONADA_SAFIX'
+  const isAlreadyProcessedByFacturador = atencion.estadoFacturacion && atencion.estadoFacturacion !== 'PENDIENTE'
+
+  let canEditEstado = false
+  if (isSuperAdminOrAdmin) {
+    canEditEstado = true
+  } else if (isFacturador) {
+    canEditEstado = !isAlreadyProcessedByFacturador
+  } else if (isProfesional) {
+    canEditEstado = atencion.estadoFacturacion === 'FACTURADA'
+  }
 
   const handleUpdateFacturacion = async () => {
     try {
@@ -1254,14 +1294,19 @@ function AtencionDetail({
         })
       })
       if (res.ok) {
-        triggerRefresh()
-        alert("Estado de facturación actualizado")
+        toast.success("Estado de facturación actualizado")
+        triggerRefresh({
+          id: atencion.id,
+          estadoFacturacion: localEstado,
+          observacionFacturacion: localObservacion
+        })
+        onBack() // Devolver inmediatamente para la sección de atenciones
       } else {
         const error = await res.json()
-        alert(`Error: ${error.error || "No se pudo actualizar"}`)
+        toast.error(`Error: ${error.error || "No se pudo actualizar"}`)
       }
     } catch (err) {
-      alert("Error de conexión.")
+      toast.error("Error de conexión.")
     } finally {
       setIsUpdating(false)
     }
@@ -1346,13 +1391,13 @@ function AtencionDetail({
             <div className="flex flex-col sm:flex-row gap-6">
               <div className="w-full sm:w-1/3">
                 <label className="text-sm font-semibold text-foreground mb-2 block">Estado Actual</label>
-                {(canManageFacturacion || (user?.rol === 'PROFESIONAL' && atencion.estadoFacturacion === 'FACTURADA')) ? (
+                {canEditEstado ? (
                   <select
                     value={localEstado}
                     onChange={(e) => setLocalEstado(e.target.value)}
                     className="form-input w-full"
                   >
-                    {canManageFacturacion && (
+                    {(isSuperAdminOrAdmin || isFacturador) && (
                       <>
                         <option value="PENDIENTE">Pendiente (En Revisión)</option>
                         <option value="FACTURADA">Facturada</option>
@@ -1360,10 +1405,15 @@ function AtencionDetail({
                         <option value="NO_FACTURABLE">No Facturable</option>
                         <option value="GLOSADA">Glosada</option>
                         <option value="PAGADA">Pagada</option>
+                        <option value="EVOLUCIONADA_SAFIX">Evolucionada (SAFIX)</option>
                       </>
                     )}
-                    {/* El Profesional solo puede marcar Evolucionada si está Facturada */}
-                    <option value="EVOLUCIONADA_SAFIX">Evolucionada (SAFIX)</option>
+                    {isProfesional && (
+                      <>
+                        <option value="FACTURADA">Facturada</option>
+                        <option value="EVOLUCIONADA_SAFIX">Evolucionada (SAFIX)</option>
+                      </>
+                    )}
                   </select>
                 ) : (
                   <div className="p-2 border border-border rounded-lg bg-muted text-sm">
@@ -1374,7 +1424,7 @@ function AtencionDetail({
 
               <div className="w-full sm:w-2/3 flex flex-col gap-2">
                  <label className="text-sm font-semibold text-foreground block">Observaciones / Motivo de devolución</label>
-                 {canManageFacturacion ? (
+                 {canEditEstado && (isSuperAdminOrAdmin || isFacturador) ? (
                    <textarea
                      rows={3}
                      value={localObservacion}
@@ -1390,7 +1440,7 @@ function AtencionDetail({
               </div>
             </div>
 
-            {(canManageFacturacion || (user?.rol === 'PROFESIONAL' && atencion.estadoFacturacion === 'FACTURADA' && localEstado === 'EVOLUCIONADA_SAFIX')) && (
+            {canEditEstado && (
               <div className="flex justify-end mt-2">
                 <button
                   type="button"

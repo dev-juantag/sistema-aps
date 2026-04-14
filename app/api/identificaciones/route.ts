@@ -40,6 +40,13 @@ export async function GET(req: Request) {
         } else if (currentUser?.territorioId) {
           whereClause.territorioId = currentUser.territorioId;
         }
+      } else if (userRole === 'AUXILIAR' || userRole === 'PROFESIONAL') {
+        // Forzar el territorio asignado al usuario para estos roles
+        if (currentUser?.territorioId) {
+          whereClause.territorioId = currentUser.territorioId;
+        } else if (requestedTerritorioId) {
+          whereClause.territorioId = requestedTerritorioId;
+        }
       } else if (requestedTerritorioId) {
         whereClause.territorioId = requestedTerritorioId
       }
@@ -48,6 +55,11 @@ export async function GET(req: Request) {
       if (settings?.currentStageStart) {
         whereClause.createdAt = { gte: settings.currentStageStart }
       }
+    }
+
+    const myOnly = searchParams.get('myOnly') === 'true'
+    if (myOnly && userId) {
+      whereClause.encuestadorId = userId
     }
 
     const searchStr = searchParams.get('search')
@@ -167,15 +179,21 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { integrantes, territorio, microterritorio, encuestadorId, userId, ...hogarData } = body
 
-    // Always prefer the token's authenticated ID to pretend who created it. 
-    // Prevent ID spoofing for field workers. 
     const authenticatedUserId = auth.decoded?.userId;
 
-    const isEfectiva = String(hogarData.estadoVisita) === '1';
+    const isEfectiva = String(hogarData.estadoVisita || '1') === '1';
+    
+    // Punto 4: Validación de Miembros
+    if (isEfectiva && (!integrantes || integrantes.length === 0)) {
+       return NextResponse.json({ 
+         success: false, 
+         error: "Una visita marcada como EFECTIVA debe tener al menos un integrante registrado." 
+       }, { status: 400 });
+    }
+
     const finalIntegrantes = isEfectiva ? (integrantes || []) : [];
 
     const toIntArray = (arr: any): number[] => {
-
       const arrayToProcess = Array.isArray(arr) ? arr : (arr ? [arr] : [])
       return arrayToProcess.map((val: any) => parseInt(String(val))).filter((n: number) => !isNaN(n))
     }

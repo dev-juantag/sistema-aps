@@ -115,7 +115,7 @@ export function MiTerritorioModule() {
              </div>
              <h2 className="text-lg font-bold mb-2">Comunidad y Coordinación</h2>
              <p className="text-sm text-muted-foreground mb-6 flex-1">
-               Únase al grupo de comunicación oficial de WhatsApp para este territorio para mantenerse al tanto de las novedades y coordinar operativos.
+               Únase al grupo de comunicación oficial de WhatsApp para este territorio para mantenerse al tanto de las novedades y coordinar temas operativos.
              </p>
 
              {territorio.whatsappLink ? (
