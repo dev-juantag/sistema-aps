@@ -2,6 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
+import { getDocumentoDinamico } from "@/lib/constants"
 
 export async function GET(request: Request) {
     try {
@@ -16,6 +17,7 @@ export async function GET(request: Request) {
                 ...p,
                 nombreCompleto: `${p.nombres} ${p.apellidos}`.trim(),
                 tipoDocumento: p.tipoDoc,
+                tipoDocumentoDinamico: getDocumentoDinamico(p.fechaNacimiento || '', p.tipoDoc),
                 genero: p.sexo
             }))
             return NextResponse.json(pacientes)
@@ -33,6 +35,7 @@ export async function GET(request: Request) {
             ...pacienteRaw,
             nombreCompleto: `${pacienteRaw.nombres} ${pacienteRaw.apellidos}`.trim(),
             tipoDocumento: pacienteRaw.tipoDoc,
+            tipoDocumentoDinamico: getDocumentoDinamico(pacienteRaw.fechaNacimiento || '', pacienteRaw.tipoDoc),
             genero: pacienteRaw.sexo
         })
 

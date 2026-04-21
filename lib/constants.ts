@@ -428,3 +428,18 @@ export function calcularCursoVida(edad: number): string {
   return 'Vejez'
 }
 
+// Helper: Determinar tipo de documento dinámico según edad
+export function getDocumentoDinamico(fechaNacimiento: string, tipoDocumentoActual: string): string {
+  if (!fechaNacimiento) return tipoDocumentoActual;
+  const edad = calcularEdad(fechaNacimiento);
+  
+  if (tipoDocumentoActual === 'RC' || tipoDocumentoActual === 'CN') {
+      if (edad >= 18) return 'CC';
+      if (edad >= 7) return 'TI';
+  } else if (tipoDocumentoActual === 'TI') {
+      if (edad >= 18) return 'CC';
+  }
+  
+  return tipoDocumentoActual;
+}
+

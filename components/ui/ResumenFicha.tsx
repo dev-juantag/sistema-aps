@@ -227,7 +227,7 @@ export default function ResumenFicha({
               <h3 className={`font-bold mb-1 ${ficha.estadoVisita === '2' ? 'text-orange-800' : 'text-red-800'}`}>
                 Motivo: Identificación {estadoVisitaLabel}
               </h3>
-              <p className={`text-sm font-medium ${ficha.estadoVisita === '2' ? 'text-orange-600' : 'text-red-600'}`}>
+              <p className={`text-sm font-medium break-words overflow-hidden ${ficha.estadoVisita === '2' ? 'text-orange-600' : 'text-red-600'}`}>
                 {ficha.observacionesRechazo || "No se registró ninguna observación exacta en el sistema."}
               </p>
             </div>
@@ -357,35 +357,7 @@ export default function ResumenFicha({
                       </div>
                     </div>
 
-                    {/* Historial de Atención Si Existe */}
-                    {pac.atenciones && pac.atenciones.length > 0 && (
-                      <div className="mt-2 pt-4 border-t border-dashed border-gray-200">
-                        <div className="flex items-center gap-2 mb-3 text-[#097b2c]">
-                          <Activity className="w-4 h-4" />
-                          <h4 className="text-[10px] font-black uppercase tracking-widest">Historial de Atenciones (SGA)</h4>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {pac.atenciones.map((at: any) => (
-                            <div key={at.id} className="flex gap-3 p-3 bg-gray-50/50 rounded-lg border border-gray-100 group transition-all">
-                              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center border border-gray-100 text-gray-400 shrink-0">
-                                <Stethoscope className="w-4 h-4" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight mb-0.5">
-                                  {new Date(at.createdAt).toLocaleDateString('es-CO')} · {at.programa?.nombre}
-                                </p>
-                                <p className="text-xs text-gray-700 font-medium truncate">
-                                  Por: {at.profesional?.nombre} {at.profesional?.apellidos}
-                                </p>
-                                <p className="text-[11px] text-gray-500 mt-1 line-clamp-1 italic italic-gray-400 border-l-2 border-gray-200 pl-2 leading-tight">
-                                  "{at.nota.slice(0, 100)}..."
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+
                   </div>
               )
             })}
@@ -412,7 +384,7 @@ export default function ResumenFicha({
                   className="flex items-center gap-2 px-5 py-2.5 bg-[#0a8c32] text-white text-sm font-bold rounded-lg hover:bg-[#086a25] transition-colors shadow-sm"
                 >
                   <Activity className="w-4 h-4" />
-                  ABRIR EDITOR LITERAL / CANVAS
+                  ABRIR EDITOR
                 </button>
               )}
             </div>

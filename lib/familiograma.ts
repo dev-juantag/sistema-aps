@@ -1,4 +1,4 @@
-import { PARENTESCO } from "@/lib/constants";
+import { PARENTESCO, calcularEdad } from "@/lib/constants";
 
 export function generateFamiliogramaAutoLayout(integrantes: any[]): string {
   if (!integrantes || integrantes.length === 0) return '';
@@ -85,7 +85,8 @@ export function generateFamiliogramaAutoLayout(integrantes: any[]): string {
       position: { x: int._x + 400, y: int._y }, // Offset total
       data: {
         nombre: (int.primerNombre || int.nombres || '') + ' ' + (int.primerApellido || int.apellidos || ''),
-        edad: age,
+        edad: int.fechaNacimiento ? calcularEdad(int.fechaNacimiento).toString() : '?',
+        fechaNacimiento: int.fechaNacimiento,
         sexo: int.sexo || 'INDEFINIDO',
         fallecido: int.estadoVital === 'FALLECIDO',
         gestante: int.gestante || 'NA',

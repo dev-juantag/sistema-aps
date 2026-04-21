@@ -233,6 +233,7 @@ export function FamiliogramaGlobalEditor({ fichaId, onClose }: { fichaId: string
                ...node.data,
                nombre: pac.nombres,
                edad: pac.fechaNacimiento ? calcularEdad(pac.fechaNacimiento) : '',
+               fechaNacimiento: pac.fechaNacimiento,
                sexo: pac.sexo,
                fallecido: pac.estadoVital === 'FALLECIDO',
                parentescoLabel: getLabel(PARENTESCO, pac.parentesco)
@@ -256,6 +257,7 @@ export function FamiliogramaGlobalEditor({ fichaId, onClose }: { fichaId: string
             data: {
               nombre: pac.nombres,
               edad: pac.fechaNacimiento ? calcularEdad(pac.fechaNacimiento) : '',
+              fechaNacimiento: pac.fechaNacimiento,
               sexo: pac.sexo,
               fallecido: pac.estadoVital === 'FALLECIDO',
               isJefe: String(pac.parentesco) === '1',

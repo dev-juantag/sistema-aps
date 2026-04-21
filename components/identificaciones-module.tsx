@@ -31,6 +31,8 @@ export function IdentificacionesModule() {
   const { data: rawProgramas } = useSWR<any>("/api/programas", fetcher)
   const programas: any[] = Array.isArray(rawProgramas) ? rawProgramas : []
 
+
+
   const isEnfermeria = () => {
     if (!user || user.rol !== 'profesional' || !user.programaId) return false;
     const prog = programas.find((p: any) => String(p.id) === String(user.programaId));
@@ -61,6 +63,17 @@ export function IdentificacionesModule() {
 
   const [showNewIdConfirm, setShowNewIdConfirm] = useState(false)
   const [deleteConfirmFicha, setDeleteConfirmFicha] = useState<{id: string, consecutivo: number} | null>(null)
+  
+  useEffect(() => {
+    if (showDetailModal || showNewIdConfirm || showImportModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    }
+  }, [showDetailModal, showNewIdConfirm, showImportModal])
   
   // Mostrar aviso de vacío
   const [notifiedEmpty, setNotifiedEmpty] = useState(false)
@@ -186,7 +199,17 @@ export function IdentificacionesModule() {
     try {
       const reader = new FileReader()
       reader.onload = async (e) => {
-        const text = e.target?.result as string
+        const buffer = e.target?.result as ArrayBuffer
+        const decoder = new TextDecoder('utf-8')
+        let text = decoder.decode(buffer)
+        
+        // Detectar si UTF-8 falló (caracteres extraños como ) o si parece estar en Latin-1
+        // Un indicio común es buscar el carácter de reemplazo  (U+FFFD)
+        if (text.includes('\uFFFD')) {
+          const isoDecoder = new TextDecoder('iso-8859-1')
+          text = isoDecoder.decode(buffer)
+        }
+
         const lines = text.split(/\r?\n/).filter(l => l.trim() !== '')
         if (lines.length < 2) {
           setImportStatus({ error: "El archivo está vacío o no tiene datos" })
@@ -212,7 +235,7 @@ export function IdentificacionesModule() {
         }
         setIsImporting(false)
       }
-      reader.readAsText(importFile)
+      reader.readAsArrayBuffer(importFile)
     } catch (err) {
       setImportStatus({ error: "Error de lectura de archivo" })
       setIsImporting(false)
@@ -492,7 +515,15 @@ export function IdentificacionesModule() {
 
       {/* MODAL VISTA DETALLADA Y PRINT */}
       {showDetailModal && (
-        <div className="fixed inset-0 z-[200] flex justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200 overflow-y-auto print:static print:bg-white print:p-0 print:overflow-visible print:inset-auto">
+        <div 
+          className="fixed inset-0 z-[200] flex justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200 overflow-y-auto print:static print:bg-white print:p-0 print:overflow-visible print:inset-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowDetailModal(false);
+              setSelectedFichaDetail(null);
+            }
+          }}
+        >
           <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto border border-border print:shadow-none print:border-none print:rounded-none print:overflow-visible print:my-0">
 
             <div className="p-0 bg-gray-50/50 relative print:bg-white print:overflow-visible">
@@ -552,8 +583,11 @@ export function IdentificacionesModule() {
       {/* Import Modal */}
       {/* MODAL CONFIRMACIÓN NUEVA IDENTIFICACIÓN */}
       {showNewIdConfirm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="w-full max-w-md rounded-[2.5rem] bg-white p-8 shadow-2xl animate-in zoom-in-95 duration-300 border-none">
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto w-full h-full"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowNewIdConfirm(false) }}
+        >
+          <div className="w-full max-w-md rounded-[2.5rem] bg-white p-8 shadow-2xl animate-in zoom-in-95 duration-300 border-none overflow-y-auto max-h-[90vh]">
             <div className="flex flex-col items-center text-center">
               <div className="w-20 h-20 bg-orange-50 text-orange-500 rounded-3xl flex items-center justify-center mb-6 border border-orange-100 shadow-inner">
                 <ShieldAlert className="w-10 h-10" />
@@ -616,8 +650,11 @@ export function IdentificacionesModule() {
       )}
 
       {showImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto w-full h-full"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowImportModal(false) }}
+        >
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg overflow-y-auto max-h-[90vh]">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-foreground">Importar Identificaciones</h2>
               <button 

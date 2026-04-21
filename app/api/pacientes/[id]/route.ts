@@ -3,6 +3,7 @@ export const runtime = "nodejs"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 import { capitalizeWords } from "@/lib/utils"
+import { getDocumentoDinamico } from "@/lib/constants"
 
 export async function GET(req: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
   try {
@@ -34,6 +35,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       ...paciente,
       nombreCompleto: `${paciente.nombres} ${paciente.apellidos}`.trim(),
       tipoDocumento: paciente.tipoDoc,
+      tipoDocumentoDinamico: getDocumentoDinamico(paciente.fechaNacimiento || '', paciente.tipoDoc),
       genero: paciente.sexo
     })
   } catch (error) {
@@ -47,7 +49,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     const params = await context.params
     const { id } = params
     const body = await req.json()
-    let { nombreCompleto, tipoDocumento, documento, genero, telefono, direccion, fechaNacimiento } = body
+    let { nombreCompleto, tipoDocumento, documento, genero, telefono, direccion, fechaNacimiento, regimen, eapb } = body
 
     let nombres: string | undefined;
     let apellidos: string | undefined;
@@ -75,6 +77,8 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         ...(telefono !== undefined && { telefono }),
         ...(direccion !== undefined && { direccion }),
         ...(fechaNacimiento && { fechaNacimiento: String(fechaNacimiento) }),
+        ...(regimen !== undefined && { regimen }),
+        ...(eapb !== undefined && { eapb }),
       },
     })
     

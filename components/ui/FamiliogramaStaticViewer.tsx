@@ -14,6 +14,7 @@ import {
   Position
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { calcularEdad } from '@/lib/constants';
 
 
 const GenogramNode = ({ data }: { data: any }) => {
@@ -211,7 +212,15 @@ export default function FamiliogramaStaticViewer({ jsonString, isPrintView = fal
   const { nodes, edges } = useMemo(() => {
     try {
       const parsed = JSON.parse(jsonString);
-      return { nodes: parsed.nodes || [], edges: parsed.edges || [] };
+      return { 
+        nodes: (parsed.nodes || []).map((node: any) => {
+          if (node.data && node.data.fechaNacimiento) {
+             node.data.edad = calcularEdad(node.data.fechaNacimiento);
+          }
+          return node;
+        }), 
+        edges: parsed.edges || [] 
+      };
     } catch (e) {
       return { nodes: [], edges: [] };
     }
@@ -259,7 +268,7 @@ export default function FamiliogramaStaticViewer({ jsonString, isPrintView = fal
         }
       `}} />
 
-      <div className="react-flow-wrapper w-full h-full">
+      <div className="react-flow-wrapper w-full h-full pointer-events-none">
         <ReactFlowProvider>
           <ReactFlow
             nodes={nodes}
@@ -273,6 +282,7 @@ export default function FamiliogramaStaticViewer({ jsonString, isPrintView = fal
             zoomOnScroll={false}
             zoomOnPinch={false}
             zoomOnDoubleClick={false}
+            preventScrolling={false}
             nodesDraggable={false}
             nodesConnectable={false}
             elementsSelectable={false}

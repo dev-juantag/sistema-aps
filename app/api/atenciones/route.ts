@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 import { capitalizeWords } from "@/lib/utils"
 import { verifyToken } from "@/lib/verify-token";
+import { getDocumentoDinamico } from "@/lib/constants";
 
 export async function GET(req: Request) {
   try {
@@ -96,6 +97,7 @@ export async function GET(req: Request) {
       pacienteNombre: `${a.paciente.nombres} ${a.paciente.apellidos}`.trim() || "",
       pacienteDocumento: a.paciente.documento || "",
       pacienteTipoDoc: a.paciente.tipoDoc || "",
+      pacienteTipoDocDinamico: getDocumentoDinamico(a.paciente.fechaNacimiento || '', a.paciente.tipoDoc || ""),
       pacienteGenero: a.paciente.sexo || "",
       pacienteTelefono: a.paciente.telefono || "",
       pacienteDireccion: a.paciente.direccion || "",
@@ -229,6 +231,7 @@ export async function POST(req: Request) {
       pacienteNombre: `${nuevaAtencion.paciente.nombres} ${nuevaAtencion.paciente.apellidos}`.trim() || "",
       pacienteDocumento: nuevaAtencion.paciente.documento || "",
       pacienteTipoDoc: nuevaAtencion.paciente.tipoDoc || "",
+      pacienteTipoDocDinamico: getDocumentoDinamico(nuevaAtencion.paciente.fechaNacimiento || '', nuevaAtencion.paciente.tipoDoc || ""),
       pacienteGenero: nuevaAtencion.paciente.sexo || "",
       pacienteTelefono: nuevaAtencion.paciente.telefono || "",
       pacienteDireccion: nuevaAtencion.paciente.direccion || "",

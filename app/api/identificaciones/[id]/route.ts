@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getDocumentoDinamico } from "@/lib/constants";
 
 export async function GET(
   req: Request,
@@ -46,6 +47,14 @@ export async function GET(
     if (!ficha.familiogramaCodigo && ficha.pacientes && ficha.pacientes.length > 0) {
        const { generateFamiliogramaAutoLayout } = await import("@/lib/familiograma");
        ficha.familiogramaCodigo = generateFamiliogramaAutoLayout(ficha.pacientes);
+    }
+
+    // Aplicar tipoDoc dinamico
+    if (ficha.pacientes) {
+       ficha.pacientes = ficha.pacientes.map((p: any) => ({
+           ...p,
+           tipoDocumentoDinamico: getDocumentoDinamico(p.fechaNacimiento || '', p.tipoDoc)
+       }));
     }
 
     return NextResponse.json(ficha);

@@ -183,11 +183,12 @@ export function DashboardHome() {
       "FACTURADA": 0,
       "DEVUELTA": 0,
       "GLOSADA": 0,
-      "EVOLUCIONADA_SAFIX": 0
+      "NO_FACTURABLE": 0
     };
     filteredAtenciones.forEach((a: any) => {
-      if (map[a.estadoFacturacion] !== undefined) {
-        map[a.estadoFacturacion]++;
+      const state = a.estadoFacturacion === "EVOLUCIONADA_SAFIX" ? "FACTURADA" : (a.estadoFacturacion || "PENDIENTE");
+      if (map[state] !== undefined) {
+        map[state]++;
       }
     });
 
@@ -196,7 +197,7 @@ export function DashboardHome() {
       "FACTURADA": "Facturadas",
       "DEVUELTA": "Devueltas",
       "GLOSADA": "Glosadas",
-      "EVOLUCIONADA_SAFIX": "SAFIX"
+      "NO_FACTURABLE": "No Facturables"
     }
 
     return Object.keys(map).map(key => ({
@@ -372,7 +373,7 @@ export function DashboardHome() {
         },
         {
           label: "Facturadas",
-          value: filteredAtenciones.filter((a: any) => a.estadoFacturacion === "FACTURADA").length,
+          value: filteredAtenciones.filter((a: any) => ["FACTURADA", "EVOLUCIONADA_SAFIX"].includes(a.estadoFacturacion)).length,
           icon: <CheckCircle2 className="h-5 w-5" />,
           color: "bg-purple-100 text-purple-600",
         },
@@ -383,10 +384,10 @@ export function DashboardHome() {
           color: "bg-red-100 text-red-600",
         },
         {
-          label: "Sincronizadas SAFIX",
-          value: filteredAtenciones.filter((a: any) => a.estadoFacturacion === "EVOLUCIONADA_SAFIX").length,
-          icon: <Activity className="h-5 w-5" />,
-          color: "bg-green-100 text-green-600",
+          label: "No Facturables",
+          value: filteredAtenciones.filter((a: any) => a.estadoFacturacion === "NO_FACTURABLE").length,
+          icon: <ShieldAlert className="h-5 w-5" />,
+          color: "bg-gray-100 text-gray-600",
         }
       ]
     }

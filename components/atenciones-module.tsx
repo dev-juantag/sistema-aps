@@ -86,7 +86,7 @@ export function AtencionesModule() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
-  const [importStatus, setImportStatus] = useState<{success?: string, error?: string} | null>(null)
+  const [importStatus, setImportStatus] = useState<{success?: string, error?: string, errors?: any[]} | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const atencionesUrl = (isAdmin || isFacturador) ? "/api/atenciones" : (user ? `/api/atenciones?profesionalId=${user.id}` : null)
@@ -257,7 +257,7 @@ export function AtencionesModule() {
       escapeCsv(a.createdAtISO ? new Date(a.createdAtISO).toLocaleString('es-CO') : a.fecha),
       escapeCsv(a.pacienteNombre),
       escapeCsv(a.pacienteDocumento),
-      escapeCsv(a.pacienteTipoDoc),
+      escapeCsv((a as any).pacienteTipoDocDinamico || a.pacienteTipoDoc),
       escapeCsv(a.pacienteGenero),
       ...(isSuperAdmin || user?.rol === 'FACTURADOR' ? [escapeCsv(a.pacienteTelefono)] : []),
       escapeCsv(a.pacienteDireccion),
@@ -327,7 +327,15 @@ export function AtencionesModule() {
     try {
       const reader = new FileReader()
       reader.onload = async (e) => {
-        const text = e.target?.result as string
+        const buffer = e.target?.result as ArrayBuffer
+        const decoder = new TextDecoder('utf-8')
+        let text = decoder.decode(buffer)
+        
+        if (text.includes('\uFFFD')) {
+          const isoDecoder = new TextDecoder('iso-8859-1')
+          text = isoDecoder.decode(buffer)
+        }
+
         const lines = text.split(/\r?\n/).filter(l => l.trim() !== '')
         if (lines.length < 2) {
           setImportStatus({ error: "El archivo está vacío o no tiene datos" })
@@ -348,14 +356,17 @@ export function AtencionesModule() {
 
         const result = await resp.json()
         if (resp.ok) {
-          setImportStatus({ success: `Importación exitosa: ${result.imported} registros creados.` })
+          setImportStatus({ 
+            success: result.message || `Importación exitosa: ${result.imported} registros creados.`,
+            errors: result.errors
+          })
           mutateAtenciones()
         } else {
           setImportStatus({ error: result.error || "Error en la importación" })
         }
         setImporting(false)
       }
-      reader.readAsText(importFile)
+      reader.readAsArrayBuffer(importFile)
     } catch (err) {
       setImportStatus({ error: "Error de lectura de archivo" })
       setImporting(false)
@@ -510,6 +521,7 @@ export function AtencionesModule() {
                       <td className="px-4 py-3 text-foreground whitespace-nowrap">{a.fecha}</td>
                       <td className="px-4 py-3 font-medium text-foreground min-w-[150px]">{a.pacienteNombre}</td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
+                        {((a as any).pacienteTipoDocDinamico || a.pacienteTipoDoc) + ' '} 
                         {a.pacienteDocumento}
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
@@ -576,8 +588,11 @@ export function AtencionesModule() {
 
       {/* Export Modal */}
       {showExportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto w-full h-full"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowExportModal(false) }}
+        >
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg overflow-y-auto max-h-[90vh]">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-foreground">Exportar Atenciones</h2>
               <button 
@@ -647,8 +662,11 @@ export function AtencionesModule() {
 
       {/* Security Alert Modal for Export */}
       {showExportAlert && (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/50 p-4 pt-20">
-          <div className="w-full max-w-md rounded-xl border border-destructive bg-card p-6 shadow-lg">
+        <div 
+          className="fixed inset-0 z-[60] flex items-start justify-center bg-black/50 p-4 pt-20 overflow-y-auto w-full h-full"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowExportAlert(false) }}
+        >
+          <div className="w-full max-w-md rounded-xl border border-destructive bg-card p-6 shadow-lg overflow-y-auto max-h-[90vh]">
             <div className="mb-4 flex items-center gap-3 text-destructive">
               <AlertTriangle className="h-6 w-6" />
               <h2 className="text-xl font-bold">Advertencia de Seguridad</h2>
@@ -682,8 +700,11 @@ export function AtencionesModule() {
 
       {/* Import Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto w-full h-full"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowImportModal(false) }}
+        >
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg overflow-y-auto max-h-[90vh]">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold text-foreground">Importar Atenciones</h2>
               <button 
@@ -1170,11 +1191,11 @@ function AtencionForm({
         <FormSection icon={<FileText className="h-5 w-5" />} title="Datos de la Atencion">
           <FormField label="Nota por valoracion" required error={errors.notaValoracion}>
             <textarea
-              rows={5}
+              rows={6}
               value={notaValoracion}
               onChange={(e) => setNotaValoracion(e.target.value)}
-              placeholder="Escriba aqui la valoracion del paciente..."
-              className="form-input min-h-[120px] resize-y"
+              placeholder="Escriba aquí la valoración detallada del paciente..."
+              className="form-input min-h-[150px] h-auto py-3 resize-y break-words"
             />
           </FormField>
 
@@ -1380,7 +1401,7 @@ function AtencionDetail({
         </FormSection>
 
         <FormSection icon={<FileText className="h-5 w-5" />} title="Nota de Valoración">
-          <div className="rounded-xl border border-border bg-muted/20 p-5 text-base text-foreground whitespace-pre-wrap leading-relaxed">
+          <div className="rounded-2xl border border-border bg-muted/10 p-6 text-sm sm:text-base text-foreground whitespace-pre-wrap break-words overflow-y-auto max-h-[400px] leading-relaxed shadow-sm">
             {atencion.notaValoracion}
           </div>
         </FormSection>
@@ -1397,7 +1418,7 @@ function AtencionDetail({
                     onChange={(e) => setLocalEstado(e.target.value)}
                     className="form-input w-full"
                   >
-                    {(isSuperAdminOrAdmin || isFacturador) && (
+                    {isSuperAdminOrAdmin && (
                       <>
                         <option value="PENDIENTE">Pendiente (En Revisión)</option>
                         <option value="FACTURADA">Facturada</option>
@@ -1406,6 +1427,13 @@ function AtencionDetail({
                         <option value="GLOSADA">Glosada</option>
                         <option value="PAGADA">Pagada</option>
                         <option value="EVOLUCIONADA_SAFIX">Evolucionada (SAFIX)</option>
+                      </>
+                    )}
+                    {isFacturador && !isSuperAdminOrAdmin && (
+                      <>
+                        <option value="PENDIENTE">Pendiente (En Revisión)</option>
+                        <option value="FACTURADA">Facturada</option>
+                        <option value="NO_FACTURABLE">No Facturable</option>
                       </>
                     )}
                     {isProfesional && (
@@ -1425,16 +1453,16 @@ function AtencionDetail({
               <div className="w-full sm:w-2/3 flex flex-col gap-2">
                  <label className="text-sm font-semibold text-foreground block">Observaciones / Motivo de devolución</label>
                  {canEditEstado && (isSuperAdminOrAdmin || isFacturador) ? (
-                   <textarea
-                     rows={3}
-                     value={localObservacion}
-                     onChange={(e) => setLocalObservacion(e.target.value)}
-                     className="form-input text-sm"
-                     placeholder="Escriba aqui comentarios sobre el cobro o indique por qué la está devolviendo..."
-                   />
+                    <textarea
+                      rows={4}
+                      value={localObservacion}
+                      onChange={(e) => setLocalObservacion(e.target.value)}
+                      className="form-input text-sm min-h-[80px] h-auto py-2.5 resize-y break-words"
+                      placeholder="Escriba aquí comentarios sobre el cobro o indique por qué la está devolviendo..."
+                    />
                  ) : (
-                   <div className="p-3 border border-border rounded-lg min-h-[50px] bg-muted/30 text-sm whitespace-pre-wrap">
-                     {localObservacion || <span className="text-muted-foreground italic">Sin observaciones</span>}
+                   <div className="p-4 border border-border rounded-xl min-h-[60px] bg-muted/20 text-sm whitespace-pre-wrap break-words overflow-hidden leading-relaxed shadow-inner">
+                     {localObservacion || <span className="text-muted-foreground italic">Sin observaciones registradas</span>}
                    </div>
                  )}
               </div>

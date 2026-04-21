@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import useSWR from "swr"
 import { fetcher } from "@/lib/fetcher"
 import { useAuth } from "@/lib/auth-context"
-import { type Paciente, TIPOS_DOCUMENTO, GENEROS } from "@/lib/data"
+import { type Paciente, GENEROS } from "@/lib/data"
+import { REGIMEN_SALUD, TIPO_DOCUMENTO, calcularEdad, calcularCursoVida } from "@/lib/constants"
 import {
   Search,
   Download,
@@ -24,6 +25,8 @@ export function AdminPacientes() {
   const pacientes: Paciente[] = Array.isArray(rawPacientes) ? rawPacientes : []
 
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const limit = 50
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Paciente>>({})
@@ -34,6 +37,14 @@ export function AdminPacientes() {
   // Estado confirmación borrar
   const [deleteConfirmInfo, setDeleteConfirmInfo] = useState<{id: string, name: string} | null>(null)
 
+  useEffect(() => {
+    if (editingId || selectedPacienteId || deleteConfirmInfo) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+  }, [editingId, selectedPacienteId, deleteConfirmInfo])
+
   const filtered = useMemo(() => {
     return pacientes.filter((p) => {
       const term = search.toLowerCase()
@@ -41,10 +52,21 @@ export function AdminPacientes() {
         (p.nombreCompleto && p.nombreCompleto.toLowerCase().includes(term)) ||
         (p.documento && p.documento.includes(term)) ||
         (p.telefono && p.telefono.includes(term)) ||
+        ((p as any).tipoDocumentoDinamico && (p as any).tipoDocumentoDinamico.toLowerCase().includes(term)) ||
         (p.tipoDocumento && p.tipoDocumento.toLowerCase().includes(term))
       )
     })
   }, [pacientes, search])
+
+  const paginatedPacientes = useMemo(() => {
+    const startIndex = (page - 1) * limit
+    return filtered.slice(startIndex, startIndex + limit)
+  }, [filtered, page])
+  
+  const totalPages = Math.ceil(filtered.length / limit)
+
+  // Reset page when search changes
+  useMemo(() => setPage(1), [search])
 
   const handleExport = () => {
     if (pacientes.length === 0) return toast.warning("No hay pacientes para exportar.")
@@ -216,7 +238,7 @@ export function AdminPacientes() {
                 <th className="px-4 py-3">Documento</th>
                 <th className="px-4 py-3">Género</th>
                 <th className="px-4 py-3">Teléfono</th>
-                <th className="px-4 py-3">Nacimiento</th>
+                <th className="px-4 py-3">Edad</th>
                 <th className="px-4 py-3 text-center">Acciones</th>
               </tr>
             </thead>
@@ -234,15 +256,15 @@ export function AdminPacientes() {
                   </td>
                 </tr>
               ) : (
-                filtered.map(p => (
+                paginatedPacientes.map(p => (
                   <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                     <td className="px-4 py-3 font-medium">{p.nombreCompleto}</td>
-                    <td className="px-4 py-3">{p.tipoDocumento}</td>
-                    <td className="px-4 py-3">{p.documento}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{(p as any).tipoDocumentoDinamico || p.tipoDocumento}</td>
+                    <td className="px-4 py-3 font-medium">{p.documento}</td>
                     <td className="px-4 py-3">{p.genero}</td>
                     <td className="px-4 py-3">{p.telefono}</td>
                     <td className="px-4 py-3">
-                      {new Date(p.fechaNacimiento).toLocaleDateString()}
+                      {calcularEdad(p.fechaNacimiento)} años
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-2">
@@ -277,6 +299,30 @@ export function AdminPacientes() {
         </div>
       </div>
 
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 bg-card border border-border rounded-xl shadow-sm">
+          <p className="text-sm text-muted-foreground">
+            Mostrando página <span className="font-bold">{page}</span> de <span className="font-bold">{totalPages}</span> (Total: {filtered.length})
+          </p>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 border border-border bg-background rounded-lg text-sm font-medium hover:bg-muted disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <button 
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-3 py-1.5 border border-border bg-background rounded-lg text-sm font-medium hover:bg-muted disabled:opacity-50"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Expediente Único Modal */}
       {selectedPacienteId && (
         <PacienteDetail 
@@ -286,19 +332,23 @@ export function AdminPacientes() {
       )}
 
       {editingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border bg-muted/30 px-6 py-4">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200 overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget) cancelEdit() }}
+        >
+          <div className="w-full max-w-lg rounded-xl border border-border bg-card shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between border-b border-border bg-muted/30 px-6 py-4 flex-shrink-0">
               <h2 className="text-lg font-semibold text-foreground">Editar Paciente</h2>
               <button
                 onClick={cancelEdit}
                 className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                type="button"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto">
               {errorEdit && (
                 <div className="mb-4 rounded-lg bg-destructive/15 px-4 py-3 text-sm text-destructive border border-destructive/20">
                   {errorEdit}
@@ -323,7 +373,8 @@ export function AdminPacientes() {
                     onChange={e => setEditForm({...editForm, tipoDocumento: e.target.value})}
                     className="w-full h-10 px-3 rounded-lg border border-input bg-background"
                   >
-                     {TIPOS_DOCUMENTO.map(t => <option key={t} value={t}>{t}</option>)}
+                     <option value="">Selecciona Doc.</option>
+                     {TIPO_DOCUMENTO.map((t: any) => <option key={t.id} value={t.id}>{t.label}</option>)}
                   </select>
                 </div>
                 
@@ -369,6 +420,11 @@ export function AdminPacientes() {
                     max={new Date().toISOString().split('T')[0]} // Previene fechas futuras
                     className="w-full h-10 px-3 rounded-lg border border-input bg-background"
                   />
+                  {editForm.fechaNacimiento && (
+                     <p className="text-xs text-muted-foreground mt-1 font-medium bg-muted/50 p-2 rounded line-clamp-1 truncate">
+                        Curso vida: {calcularCursoVida(calcularEdad(editForm.fechaNacimiento as string))}
+                     </p>
+                  )}
                 </div>
 
                 <div className="sm:col-span-2">
@@ -380,6 +436,33 @@ export function AdminPacientes() {
                     className="w-full h-10 px-3 rounded-lg border border-input bg-background"
                   />
                 </div>
+
+                {isSuperAdmin && (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">Régimen</label>
+                      <select
+                        value={editForm.regimen || ""}
+                        onChange={e => setEditForm({...editForm, regimen: e.target.value})}
+                        className="w-full h-10 px-3 rounded-lg border border-input bg-background"
+                      >
+                         <option value="">Seleccione Régimen</option>
+                         {REGIMEN_SALUD.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium mb-1 block">EAPB / EPS</label>
+                      <input
+                        type="text"
+                        value={editForm.eapb || ""}
+                        onChange={e => setEditForm({...editForm, eapb: e.target.value})}
+                        placeholder="Nombre de la EPS"
+                        className="w-full h-10 px-3 rounded-lg border border-input bg-background"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="mt-6 flex justify-end gap-3 border-t border-border pt-4">

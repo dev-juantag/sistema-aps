@@ -379,7 +379,13 @@ function ImportUsersModal({ programas, territorios, onClose, onSuccess }: any) {
     if (!file) return
 
     setIsImporting(true)
-    const text = await file.text()
+    const buffer = await file.arrayBuffer()
+    const decoder = new TextDecoder('utf-8')
+    let text = decoder.decode(buffer)
+    
+    if (text.includes('\uFFFD')) {
+      text = new TextDecoder('iso-8859-1').decode(buffer)
+    }
     
     // Análisis básico
     const rows = text.split('\n').map(r => r.trim()).filter(Boolean)
@@ -487,8 +493,11 @@ function ImportUsersModal({ programas, territorios, onClose, onSuccess }: any) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-[500px] rounded-2xl bg-card p-6 shadow-2xl relative">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 w-full h-full overflow-y-auto"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="w-full max-w-[500px] rounded-2xl bg-card p-6 shadow-2xl relative overflow-y-auto max-h-[90vh]">
         <button 
           onClick={onClose}
           className="absolute right-4 top-4 rounded-md p-1.5 text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
@@ -622,8 +631,11 @@ function UserFormModal({ user, programas, territorios, onClose, onSave }: any) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-[500px] rounded-2xl bg-card p-6 shadow-2xl relative">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 w-full h-full overflow-y-auto"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="w-full max-w-[500px] rounded-2xl bg-card p-6 shadow-2xl relative overflow-y-auto max-h-[90vh]">
         <button 
           onClick={onClose}
           className="absolute right-4 top-4 rounded-md p-1.5 text-muted-foreground hover:bg-muted transition-colors cursor-pointer"

@@ -27,6 +27,8 @@ export interface Paciente {
   telefono: string
   direccion: string
   fechaNacimiento: string
+  regimen?: string
+  eapb?: string
 }
 
 export interface Atencion {

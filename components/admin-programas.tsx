@@ -272,8 +272,11 @@ function ProgramaFormModal({ programa, onClose, onSuccess }: any) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-[400px] rounded-2xl bg-card p-6 shadow-2xl relative">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto w-full h-full"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="w-full max-w-[400px] rounded-2xl bg-card p-6 shadow-2xl relative overflow-y-auto max-h-[90vh]">
         <button 
           onClick={onClose}
           className="absolute right-4 top-4 rounded-md p-1.5 text-muted-foreground hover:bg-muted transition-colors cursor-pointer"

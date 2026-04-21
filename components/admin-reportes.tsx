@@ -63,13 +63,15 @@ export function AdminReportes() {
   const { data: rawUsers, isLoading: loadingUsers } = useSWR<any>("/api/users", fetcher)
   const { data: stageSettings, isLoading: loadingStage } = useSWR<any>("/api/settings/stage", fetcher)
   const { data: idStats, isLoading: loadingStats } = useSWR<any>(`/api/identificaciones/stats?filterMode=${filterMode}&startDate=${dateRange.start}&endDate=${dateRange.end}`, fetcher)
+  const { data: rawTerritorios, isLoading: loadingTerr } = useSWR<any>("/api/territorios", fetcher)
   
   const atenciones: any[] = Array.isArray(rawAtenciones) ? rawAtenciones : []
   const programas: any[] = Array.isArray(rawProgramas) ? rawProgramas : []
   const users: any[] = Array.isArray(rawUsers) ? rawUsers : []
+  const territorios: any[] = Array.isArray(rawTerritorios) ? rawTerritorios : []
   const currentStageStart = stageSettings?.currentStageStart || null
   
-  const loading = loadingAtenciones || loadingProgramas || loadingUsers || loadingStage || loadingStats
+  const loading = loadingAtenciones || loadingProgramas || loadingUsers || loadingStage || loadingStats || loadingTerr
 
 
 
@@ -139,6 +141,29 @@ export function AdminReportes() {
   const pieAtenciones = useMemo(() => {
     return atencionesPerPrograma.filter((p) => p.atenciones > 0).map((p) => ({ name: p.nombre, value: p.atenciones }))
   }, [atencionesPerPrograma])
+
+  const facturacionStats = useMemo(() => {
+    if (!territorios.length || !users.length) return []
+    
+    return territorios.map(t => {
+      const profIds = users.filter((u: any) => u.territorioId === t.id).map((u: any) => u.id)
+      const atencionesTerr = filteredAtenciones.filter((a: any) => profIds.includes(a.profesionalId))
+      
+      const pendientes = atencionesTerr.filter((a: any) => a.estadoFacturacion === "PENDIENTE").length
+      const facturadas = atencionesTerr.filter((a: any) => ["FACTURADA", "EVOLUCIONADA_SAFIX", "PAGADA"].includes(a.estadoFacturacion)).length
+      const devueltas = atencionesTerr.filter((a: any) => ["DEVUELTA", "GLOSADA", "NO_FACTURABLE"].includes(a.estadoFacturacion)).length
+      
+      return {
+        id: t.id,
+        nombre: t.nombre,
+        codigo: t.codigo,
+        pendientes,
+        facturadas,
+        devueltas,
+        total: atencionesTerr.length
+      }
+    }).sort((a,b) => b.total - a.total)
+  }, [filteredAtenciones, territorios, users])
 
   return (
     <div className="flex flex-col gap-6 w-full min-w-0 overflow-hidden pb-10">
@@ -343,6 +368,68 @@ export function AdminReportes() {
                   </tbody>
                 </table>
              </div>
+          </div>
+
+          {/* Estadísticas de Facturación por Territorio */}
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm flex flex-col gap-6">
+            <div className="flex items-center gap-2">
+               <Activity className="h-5 w-5 text-primary" />
+               <h2 className="text-lg font-semibold text-foreground">Control de Facturación por Territorio</h2>
+            </div>
+            
+            <div className="h-80">
+               <ResponsiveContainer width="100%" height="100%">
+                 <BarChart data={facturacionStats.filter(t => t.total > 0)} margin={{ top: 20, right: 30, left: 0, bottom: 50 }}>
+                   <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.90 0.02 285)" vertical={false} />
+                   <XAxis dataKey="codigo" tick={{ fontSize: 11 }} angle={-35} textAnchor="end" height={60} />
+                   <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                   <Tooltip 
+                     contentStyle={{ backgroundColor: "var(--card)", borderRadius: "12px", border: "1px solid var(--border)", boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)" }}
+                   />
+                   <Legend verticalAlign="top" height={36} />
+                   <Bar dataKey="facturadas" name="Facturadas/SAFIX" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} />
+                   <Bar dataKey="pendientes" name="Pendientes" stackId="a" fill="#f59e0b" />
+                   <Bar dataKey="devueltas" name="Devueltas/No Facturables" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                 </BarChart>
+               </ResponsiveContainer>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-border">
+               <table className="w-full text-sm">
+                 <thead className="bg-muted/30">
+                   <tr>
+                     <th className="px-4 py-3 text-left font-bold border-b">Territorio</th>
+                     <th className="px-4 py-3 text-center font-bold border-b">Total Atenciones</th>
+                     <th className="px-4 py-3 text-center font-bold border-b text-emerald-600 dark:text-emerald-500">Facturadas</th>
+                     <th className="px-4 py-3 text-center font-bold border-b text-amber-600 dark:text-amber-500">Pendientes</th>
+                     <th className="px-4 py-3 text-center font-bold border-b text-rose-600 dark:text-rose-500">Objeciones</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {facturacionStats.map(t => (
+                     <tr key={t.id} className="border-b last:border-0 hover:bg-muted/10">
+                       <td className="px-4 py-3 font-medium">
+                         <div className="flex flex-col">
+                           <span>{t.nombre}</span>
+                           <span className="text-[10px] text-muted-foreground">{t.codigo}</span>
+                         </div>
+                       </td>
+                       <td className="px-4 py-3 text-center font-black">{t.total}</td>
+                       <td className="px-4 py-3 text-center font-semibold text-emerald-600 dark:text-emerald-500">{t.facturadas}</td>
+                       <td className="px-4 py-3 text-center font-semibold text-amber-600 dark:text-amber-500">{t.pendientes}</td>
+                       <td className="px-4 py-3 text-center font-semibold text-rose-600 dark:text-rose-500">{t.devueltas}</td>
+                     </tr>
+                   ))}
+                   {facturacionStats.length === 0 && (
+                     <tr>
+                       <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground italic">
+                         No hay registros mapeables a un territorio.
+                       </td>
+                     </tr>
+                   )}
+                 </tbody>
+               </table>
+            </div>
           </div>
         </>
       )}
@@ -618,8 +705,11 @@ export function AdminReportes() {
 
       {/* Restart Stage Modal */}
       {showRestartModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-destructive/20 bg-card p-8 shadow-2xl">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm overflow-y-auto w-full h-full"
+          onClick={(e) => { if (e.target === e.currentTarget && !isRestarting) setShowRestartModal(false) }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-destructive/20 bg-card p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="mb-6 flex flex-col items-center text-center gap-4">
               <div className="p-4 bg-destructive/10 rounded-full text-destructive"><AlertTriangle className="h-10 w-10" /></div>
               <h2 className="text-2xl font-black text-foreground">¿Reiniciar Estadísticas?</h2>

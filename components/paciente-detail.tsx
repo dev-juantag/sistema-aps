@@ -1,7 +1,7 @@
 "use client"
 
 import useSWR from "swr"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { fetcher } from "@/lib/fetcher"
 import { FamiliogramaGlobalEditor } from "./familiograma-global-editor"
 import {
@@ -20,6 +20,14 @@ import { calcularEdad, calcularCursoVida } from "@/lib/constants"
 export function PacienteDetail({ pacienteId, onClose }: { pacienteId: string, onClose: () => void }) {
   const [showFamiliograma, setShowFamiliograma] = useState(false)
   const { data: paciente, error } = useSWR(`/api/pacientes/${pacienteId}`, fetcher)
+
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
 
   if (error) {
     return (
@@ -43,8 +51,11 @@ export function PacienteDetail({ pacienteId, onClose }: { pacienteId: string, on
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 sm:p-6 md:p-12 overflow-y-auto animate-in fade-in duration-200">
-      <div className="relative w-full max-w-5xl rounded-xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 sm:p-6 md:p-12 overflow-y-auto animate-in fade-in duration-200"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="relative w-full max-w-5xl rounded-xl border border-border bg-card shadow-2xl flex flex-col max-h-[90vh]">
         {/* Header Fijo */}
         <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-primary/5 to-transparent px-6 py-4 flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -74,7 +85,7 @@ export function PacienteDetail({ pacienteId, onClose }: { pacienteId: string, on
             </h3>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <DataCard title="Nombre Completo" value={paciente.nombreCompleto} />
-              <DataCard title="Tipo y documento" value={`${paciente.tipoDocumento} ${paciente.documento}`} />
+              <DataCard title="Tipo y documento" value={`${paciente.tipoDocumentoDinamico || paciente.tipoDocumento} ${paciente.documento}`} />
               <DataCard title="Género" value={paciente.genero} />
               <DataCard title="Teléfono" value={paciente.telefono} />
               <DataCard title="Dirección" value={paciente.direccion} />

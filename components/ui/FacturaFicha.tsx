@@ -114,7 +114,7 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
             <h2 className={headerCls}>2. Códigos de Identificación</h2>
             <table className={tblCls}>
               <tbody>
-                <tr><Th>Código de Ficha Física</Th><Td>{ficha.codFicha || 'N/A'}</Td></tr>
+                <tr><Th>Código de Ficha</Th><Td>{ficha.codFicha || 'N/A'}</Td></tr>
                 <tr><Th>Código / Número de Hogar</Th><Td className="font-sans">{ficha.numHogar || 'N/A'}</Td></tr>
                 <tr><Th>Código / Número de Familia</Th><Td className="font-sans">{ficha.numFamilia || 'N/A'}</Td></tr>
                 <tr><Th>Código UZPE</Th><Td>{ficha.uzpe || 'N/A'}</Td></tr>
@@ -291,7 +291,7 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
                       {/* HISTORIAL DE ATENCIONES IMPRESO */}
                       {int.atenciones && int.atenciones.length > 0 && (
                         <div className="mt-4 pt-3 border-t border-dashed border-gray-300 print:break-inside-avoid">
-                           <h4 className="font-bold text-xs uppercase tracking-widest text-gray-500 mb-2">Historial SGA (Atenciones Recientes)</h4>
+                           <h4 className="font-bold text-xs uppercase tracking-widest text-gray-500 mb-2">Historial de atenciones</h4>
                            <table className="w-full text-left text-[10px] border-collapse">
                              <thead>
                                <tr className="text-gray-400">
