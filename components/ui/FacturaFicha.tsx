@@ -48,7 +48,7 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
   const Td = ({ children, className, style }: { children: React.ReactNode, className?: string, style?: React.CSSProperties }) => <td className={`${tdCls} ${className || ''}`} style={style}>{children}</td>
 
   return (
-    <div className={`${showOnScreen ? 'block' : 'absolute w-[1024px] h-[500px] overflow-hidden -z-50 opacity-0 pointer-events-none print:static print:w-full print:h-auto print:opacity-100 print:overflow-visible print:pointer-events-auto'} font-sans text-black bg-white max-w-none mx-auto p-4 md:p-8 leading-normal print:p-0`}>
+    <div className={`${showOnScreen ? 'block' : 'absolute w-[1024px] h-[500px] overflow-hidden -z-50 opacity-0 pointer-events-none print:static print:w-[1024px] print:h-auto print:opacity-100 print:overflow-visible print:pointer-events-auto'} font-sans text-black bg-white max-w-none mx-auto p-4 md:p-8 leading-normal print:p-0`}>
       
       {/* HEADER GLOBAL */}
       <div className="flex items-center justify-between mb-8 pb-4" style={{ borderBottom: '4px solid black' }}>
@@ -290,27 +290,32 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
 
                       {/* HISTORIAL DE ATENCIONES IMPRESO */}
                       {int.atenciones && int.atenciones.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-dashed border-gray-300 print:break-inside-avoid">
-                           <h4 className="font-bold text-xs uppercase tracking-widest text-gray-500 mb-2">Historial de atenciones</h4>
-                           <table className="w-full text-left text-[10px] border-collapse">
+                        <div className="mt-5 pt-4 border-t-2 border-gray-200 print:break-inside-avoid bg-gray-50/50 rounded-lg p-4">
+                           <div className="flex items-center gap-2 mb-3">
+                             <h4 className="font-black text-sm uppercase tracking-widest text-[#081e69]">Historial de Atenciones Personal</h4>
+                             <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Total: {int.atenciones.length} atenciones</span>
+                           </div>
+                           <table className="w-full text-left text-xs border-collapse bg-white border border-gray-200 rounded overflow-hidden">
                              <thead>
-                               <tr className="text-gray-400">
-                                 <th className="border-b border-gray-200 py-1 font-bold">Fecha / Programa</th>
-                                 <th className="border-b border-gray-200 py-1 font-bold">Profesional</th>
-                                 <th className="border-b border-gray-200 py-1 font-bold">Nota Clínica</th>
+                               <tr className="bg-gray-100 text-gray-600">
+                                 <th className="border-b border-gray-200 py-2 px-3 font-bold uppercase text-[10px] tracking-wider">Fecha / Programa</th>
+                                 <th className="border-b border-gray-200 py-2 px-3 font-bold uppercase text-[10px] tracking-wider">Profesional</th>
+                                 <th className="border-b border-gray-200 py-2 px-3 font-bold uppercase text-[10px] tracking-wider">Nota Clínica / Motivo</th>
                                </tr>
                              </thead>
                              <tbody>
-                               {int.atenciones.slice(0, 3).map((at: any) => (
-                                 <tr key={at.id}>
-                                   <td className="py-1.5 border-b border-gray-50 pr-2 align-top">
-                                     <div className="font-bold">{new Date(at.createdAt).toLocaleDateString('es-CO')}</div>
-                                     <div className="uppercase">{at.programa?.nombre}</div>
+                               {int.atenciones
+                                 .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                 .map((at: any) => (
+                                 <tr key={at.id} className="hover:bg-gray-50">
+                                   <td className="py-2 px-3 border-b border-gray-100 align-top">
+                                     <div className="font-bold text-gray-900">{new Date(at.createdAt).toLocaleDateString('es-CO')}</div>
+                                     <div className="uppercase text-gray-500 font-medium text-[10px] mt-0.5">{at.programa?.nombre}</div>
                                    </td>
-                                   <td className="py-1.5 border-b border-gray-50 pr-2 align-top font-medium">
+                                   <td className="py-2 px-3 border-b border-gray-100 align-top font-semibold text-gray-800">
                                      {at.profesional?.nombre} {at.profesional?.apellidos}
                                    </td>
-                                   <td className="py-1.5 border-b border-gray-50 align-top italic text-gray-600">
+                                   <td className="py-2 px-3 border-b border-gray-100 align-top italic text-gray-700">
                                      &quot;{at.motivo || at.nota || 'Consulta registrada'}&quot;
                                    </td>
                                  </tr>

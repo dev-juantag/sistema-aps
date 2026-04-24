@@ -48,7 +48,7 @@ export function EstadoFacturacionBadge({ estado }: { estado?: string }) {
     "PENDIENTE": { label: "En Revisión", color: "bg-yellow-100 text-yellow-800 border-yellow-200", icon: Clock },
     "DEVUELTA": { label: "Devuelta", color: "bg-red-100 text-red-800 border-red-200", icon: AlertTriangle },
     "FACTURADA": { label: "Facturada", color: "bg-purple-100 text-purple-800 border-purple-200", icon: CheckCircle },
-    "EVOLUCIONADA_SAFIX": { label: "Evolucionada (Safix)", color: "bg-green-100 text-green-800 border-green-200", icon: Activity },
+    "EVOLUCIONADA_SAFIX": { label: "Evolucionada", color: "bg-green-100 text-green-800 border-green-200", icon: Activity },
     "GLOSADA": { label: "Glosada", color: "bg-orange-100 text-orange-800 border-orange-200", icon: Ban },
     "PAGADA": { label: "Pagada", color: "bg-blue-100 text-blue-800 border-blue-200", icon: CheckCircle },
   }
@@ -77,7 +77,7 @@ export function AtencionesModule() {
 
   // Estado de exportación
   const [showExportModal, setShowExportModal] = useState(false)
-  const [exportType, setExportType] = useState<"currentStage" | "all" | "range">("currentStage")
+  const [exportType, setExportType] = useState<"currentStage" | "all" | "range">(user?.rol === 'PROFESIONAL' ? "range" : "currentStage")
   const [exportStart, setExportStart] = useState("")
   const [exportEnd, setExportEnd] = useState("")
   const [showExportAlert, setShowExportAlert] = useState(false)
@@ -89,21 +89,23 @@ export function AtencionesModule() {
   const [importStatus, setImportStatus] = useState<{success?: string, error?: string, errors?: any[]} | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
-  const atencionesUrl = (isAdmin || isFacturador) ? "/api/atenciones" : (user ? `/api/atenciones?profesionalId=${user.id}` : null)
-  const { data: atencionesData, error: errAt, mutate: mutateAtenciones } = useSWR(atencionesUrl, fetcher)
   const { data: stageData, error: errSt } = useSWR(user ? "/api/settings/stage" : null, fetcher)
   const { data: programasData, error: errPr } = useSWR(user ? "/api/programas" : null, fetcher)
 
-  const loading = !atencionesData || !stageData || !programasData
-  const atenciones: Atencion[] = useMemo(() => Array.isArray(atencionesData) ? atencionesData : [], [atencionesData])
   const programas: {id: string, nombre: string}[] = useMemo(() => Array.isArray(programasData) ? programasData : [], [programasData])
-  const currentStageStart: string | null = useMemo(() => stageData?.currentStageStart || null, [stageData])
   
   const isEnfermeria = () => {
     if (!user || user.rol?.toLowerCase() !== 'profesional' || !user.programaId) return false;
     const prog = programas.find((p: any) => String(p.id) === String(user.programaId));
     return prog ? prog.nombre.toLowerCase().includes('enfermer') : false;
   }
+
+  const atencionesUrl = (isAdmin || isFacturador || isEnfermeria()) ? "/api/atenciones" : (user ? `/api/atenciones?profesionalId=${user.id}` : null)
+  const { data: atencionesData, error: errAt, mutate: mutateAtenciones } = useSWR(atencionesUrl, fetcher)
+
+  const loading = !atencionesData || !stageData || !programasData
+  const atenciones: Atencion[] = useMemo(() => Array.isArray(atencionesData) ? atencionesData : [], [atencionesData])
+  const currentStageStart: string | null = useMemo(() => stageData?.currentStageStart || null, [stageData])
   
   // Exponemos la función de mutate para cuando se crea o elimina un registro o para optimistic UI
   const triggerRefresh = (optimisticAtencion?: Partial<Atencion>) => {
@@ -129,7 +131,8 @@ export function AtencionesModule() {
       const matchSearch =
         !search ||
         a.pacienteNombre.toLowerCase().includes(search.toLowerCase()) ||
-        a.pacienteDocumento.includes(search)
+        a.pacienteDocumento.includes(search) ||
+        (a.profesionalNombre && a.profesionalNombre.toLowerCase().includes(search.toLowerCase()))
       const matchPrograma = !filterPrograma || a.programaId === filterPrograma
       
       let matchTime = true
@@ -207,8 +210,12 @@ export function AtencionesModule() {
     )
   }
 
-  const handleExport = () => {
+  const handleExport = async () => {
     let toExport = atenciones;
+
+    if (!isAdmin && !isSuperAdmin && !isFacturador) {
+      toExport = toExport.filter(a => a.profesionalId === user?.id);
+    }
 
     if (!isSuperAdmin && currentStageStart) {
       toExport = toExport.filter(a => new Date(a.fecha + "T00:00:00") >= new Date(currentStageStart));
@@ -222,11 +229,68 @@ export function AtencionesModule() {
         const beforeEnd = !exportEnd || a.fecha <= exportEnd;
         return afterStart && beforeEnd;
       });
+      // also filter by user if not admin
+      if (!isAdmin && !isSuperAdmin && !isFacturador) {
+        toExport = toExport.filter(a => a.profesionalId === user?.id);
+      }
     }
 
     if (toExport.length === 0) {
       toast.warning("No hay atenciones para exportar en el rango seleccionado");
+      setShowExportModal(false);
       return;
+    }
+
+    if (!isAdmin && !isSuperAdmin && !isFacturador) {
+      if (exportType === "range") {
+        if (!exportStart || !exportEnd) {
+          toast.error("Debe seleccionar una fecha de inicio y una de fin para descargar.");
+          setShowExportModal(false);
+          return;
+        }
+        
+        const start = new Date(exportStart);
+        const end = new Date(exportEnd);
+        const limitDate = new Date();
+        limitDate.setMonth(limitDate.getMonth() - 3);
+
+        if (start < limitDate) {
+          toast.error("No puede seleccionar una fecha anterior a 3 meses.");
+          setShowExportModal(false);
+          return;
+        }
+        if (end > new Date()) {
+          toast.error("La fecha final no puede ser superior a hoy.");
+          setShowExportModal(false);
+          return;
+        }
+      }
+
+      try {
+        const token = localStorage.getItem("salud-pereira-token")
+        const checkRes = await fetch("/api/download-limit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({ type: "atenciones", action: "check" })
+        });
+        
+        if (!checkRes.ok) {
+           toast.error("Ocurrió un error verificando el límite de descargas. Intente de nuevo o avise a soporte.");
+           setShowExportModal(false);
+           return;
+        }
+
+        const checkData = await checkRes.json();
+        if (!checkData.allowed) {
+          toast.error(`Ya has descargado el excel. La descarga estará disponible la siguiente semana (${checkData.nextAvailable}).`, { duration: 5000 });
+          setShowExportModal(false);
+          return;
+        }
+      } catch (err) {
+        toast.error("Error validando permisos de descarga.");
+        setShowExportModal(false);
+        return;
+      }
     }
 
     const calcularEdad = (fechaNac: string) => {
@@ -244,8 +308,8 @@ export function AtencionesModule() {
     const headers = [
       "Fecha y Hora de registro", "Paciente Nombre", "Documento", "Tipo_Doc", "Genero", 
       ...(isSuperAdmin || user?.rol === 'FACTURADOR' ? ["Telefono"] : []), "Direccion", "Edad", "Fecha_Nacimiento",
-      "Regimen", "EAPB", "Programa", "Profesional", "Nota_Valoracion",
-      ...(isSuperAdmin || user?.rol === 'FACTURADOR' ? ["Estado Facturacion", "Observacion Facturacion"] : [])
+      "Regimen", "EAPB", "Programa", "Profesional", "Nota_Valoracion", "Estado Facturacion",
+      ...(isSuperAdmin || user?.rol === 'FACTURADOR' ? ["Observacion Facturacion"] : [])
     ]
     
     const escapeCsv = (str?: string) => {
@@ -268,7 +332,8 @@ export function AtencionesModule() {
       escapeCsv(programas.find(p => p.id === a.programaId)?.nombre),
       escapeCsv(a.profesionalNombre),
       escapeCsv(a.notaValoracion),
-      ...(isSuperAdmin || user?.rol === 'FACTURADOR' ? [escapeCsv(a.estadoFacturacion), escapeCsv(a.observacionFacturacion)] : [])
+      escapeCsv(a.estadoFacturacion),
+      ...(isSuperAdmin || user?.rol === 'FACTURADOR' ? [escapeCsv(a.observacionFacturacion)] : [])
     ])
     
     // Auditory Watermark Metadata
@@ -297,6 +362,15 @@ export function AtencionesModule() {
     link.click()
     document.body.removeChild(link)
     
+    if (!isAdmin && !isSuperAdmin && !isFacturador) {
+      const token = localStorage.getItem("salud-pereira-token")
+      await fetch("/api/download-limit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ type: "atenciones", action: "update" })
+      });
+    }
+
     setShowExportModal(false)
   }
 
@@ -373,6 +447,11 @@ export function AtencionesModule() {
     }
   }
 
+  const maxDateStr = new Date().toISOString().split('T')[0];
+  const minDateLimit = new Date();
+  minDateLimit.setMonth(minDateLimit.getMonth() - 3);
+  const minDateStr = minDateLimit.toISOString().split('T')[0];
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -401,7 +480,10 @@ export function AtencionesModule() {
             </button>
           )}
           <button
-            onClick={() => setShowExportModal(true)}
+            onClick={() => {
+              if (user?.rol === 'PROFESIONAL') setExportType("range")
+              setShowExportModal(true)
+            }}
             className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer w-full sm:w-auto"
           >
             <Download className="h-4 w-4" />
@@ -431,7 +513,17 @@ export function AtencionesModule() {
             className="h-10 w-full rounded-lg border border-input bg-card pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all"
           />
         </div>
-        {isAdmin && (
+        <select
+          value={filterTime}
+          onChange={(e) => setFilterTime(e.target.value)}
+          className="h-10 rounded-lg border border-input bg-card px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all"
+        >
+          <option value="all">Todas las atenciones</option>
+          <option value="today">Hoy</option>
+          <option value="7days">Últimos 7 días</option>
+          <option value="30days">Últimos 30 días</option>
+        </select>
+        {(isAdmin || isSuperAdmin || isEnfermeria()) && (
           <select
             value={filterPrograma}
             onChange={(e) => setFilterPrograma(e.target.value)}
@@ -445,16 +537,6 @@ export function AtencionesModule() {
             ))}
           </select>
         )}
-        <select
-          value={filterTime}
-          onChange={(e) => setFilterTime(e.target.value)}
-          className="h-10 rounded-lg border border-input bg-card px-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all"
-        >
-          <option value="all">Todas las atenciones</option>
-          <option value="today">Hoy</option>
-          <option value="7days">Últimos 7 días</option>
-          <option value="30days">Últimos 30 días</option>
-        </select>
       </div>
 
       {/* Results count */}
@@ -594,7 +676,9 @@ export function AtencionesModule() {
         >
           <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg overflow-y-auto max-h-[90vh]">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-foreground">Exportar Atenciones</h2>
+              <h2 className="text-xl font-bold text-foreground">
+                {!isAdmin && !isSuperAdmin && !isFacturador ? "Descargar mis atenciones" : "Exportar Atenciones"}
+              </h2>
               <button 
                 onClick={() => setShowExportModal(false)}
                 className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
@@ -604,20 +688,7 @@ export function AtencionesModule() {
             </div>
             
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-foreground">Opciones de exportación</label>
-                <select
-                  value={exportType}
-                  onChange={(e) => setExportType(e.target.value as "currentStage" | "all" | "range")}
-                  className="form-input"
-                >
-                  <option value="currentStage">{isSuperAdmin ? "Etapa Actual" : "Descargar atenciones"}</option>
-                  {isSuperAdmin && <option value="all">Todo el historial</option>}
-                  <option value="range">Rango de fechas</option>
-                </select>
-              </div>
-
-              {exportType === "range" && (
+              {!isAdmin && !isSuperAdmin && !isFacturador ? (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-medium text-foreground">Fecha inicio</label>
@@ -626,6 +697,8 @@ export function AtencionesModule() {
                       value={exportStart}
                       onChange={(e) => setExportStart(e.target.value)}
                       className="form-input"
+                      min={minDateStr}
+                      max={maxDateStr}
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -635,9 +708,55 @@ export function AtencionesModule() {
                       value={exportEnd}
                       onChange={(e) => setExportEnd(e.target.value)}
                       className="form-input"
+                      min={minDateStr}
+                      max={maxDateStr}
                     />
                   </div>
                 </div>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-foreground">Opciones de exportación</label>
+                    <select
+                      value={exportType}
+                      onChange={(e) => setExportType(e.target.value as "currentStage" | "all" | "range")}
+                      className="form-input"
+                    >
+                      {(isAdmin || isFacturador || isSuperAdmin) && (
+                        <option value="currentStage">{isSuperAdmin ? "Etapa Actual" : "Descargar atenciones"}</option>
+                      )}
+                      {isSuperAdmin && <option value="all">Todo el historial</option>}
+                      <option value="range">Rango de fechas</option>
+                    </select>
+                  </div>
+
+                  {exportType === "range" && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium text-foreground">Fecha inicio</label>
+                        <input
+                          type="date"
+                          value={exportStart}
+                          onChange={(e) => setExportStart(e.target.value)}
+                          className="form-input"
+                          min={minDateStr}
+                          max={maxDateStr}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium text-foreground">Fecha fin</label>
+                        <input
+                          type="date"
+                          value={exportEnd}
+                          onChange={(e) => setExportEnd(e.target.value)}
+                          className="form-input"
+                          min={minDateStr}
+                          max={maxDateStr}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="mt-4 flex justify-end gap-3">
@@ -1422,11 +1541,8 @@ function AtencionDetail({
                       <>
                         <option value="PENDIENTE">Pendiente (En Revisión)</option>
                         <option value="FACTURADA">Facturada</option>
-                        <option value="DEVUELTA">Devuelta</option>
                         <option value="NO_FACTURABLE">No Facturable</option>
-                        <option value="GLOSADA">Glosada</option>
-                        <option value="PAGADA">Pagada</option>
-                        <option value="EVOLUCIONADA_SAFIX">Evolucionada (SAFIX)</option>
+                        <option value="EVOLUCIONADA_SAFIX">Evolucionada</option>
                       </>
                     )}
                     {isFacturador && !isSuperAdminOrAdmin && (
@@ -1439,7 +1555,7 @@ function AtencionDetail({
                     {isProfesional && (
                       <>
                         <option value="FACTURADA">Facturada</option>
-                        <option value="EVOLUCIONADA_SAFIX">Evolucionada (SAFIX)</option>
+                        <option value="EVOLUCIONADA_SAFIX">Evolucionada</option>
                       </>
                     )}
                   </select>

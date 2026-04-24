@@ -232,7 +232,9 @@ export function Dashboard() {
                 {user?.nombre} {user?.apellidos}
               </span>
               <span className="text-[11px] capitalize text-sidebar-foreground/60">
-                {user?.rol}
+                {user?.rol?.toLowerCase() === 'profesional' 
+                  ? `Profesional en ${programas.find((p: any) => String(p.id) === String(user.programaId))?.nombre || '...'}`
+                  : user?.rol}
               </span>
             </div>
           </div>
@@ -263,7 +265,11 @@ export function Dashboard() {
               <p className="text-sm font-medium text-foreground line-clamp-1 max-w-[150px] sm:max-w-none">
                 {user?.nombre} {user?.apellidos}
               </p>
-              <p className="text-[11px] text-muted-foreground capitalize">{user?.rol}</p>
+              <p className="text-[11px] text-muted-foreground capitalize">
+                {user?.rol?.toLowerCase() === 'profesional' 
+                  ? `Profesional en ${programas.find((p: any) => String(p.id) === String(user.programaId))?.nombre || '...'}`
+                  : user?.rol}
+              </p>
             </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shrink-0 shadow-sm">
               {user?.nombre?.[0]}

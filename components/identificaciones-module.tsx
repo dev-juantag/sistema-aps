@@ -44,10 +44,15 @@ export function IdentificacionesModule() {
   const pagination = rawFichas?.pagination || { page: 1, totalPages: 1, totalCount: fichasData.length }
 
   const [exporting, setExporting] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportType, setExportType] = useState<"all" | "range">("all")
+  const [exportStart, setExportStart] = useState("")
+  const [exportEnd, setExportEnd] = useState("")
+  const [showExportAlert, setShowExportAlert] = useState(false)
   
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [showMicroModal, setShowMicroModal] = useState(false)
-  const [selectedMicro, setSelectedMicro] = useState("MT01")
+  const [selectedMicro, setSelectedMicro] = useState("")
 
   // Estados para Modal de Vista Detallada
   const [showDetailModal, setShowDetailModal] = useState(false)
@@ -65,7 +70,7 @@ export function IdentificacionesModule() {
   const [deleteConfirmFicha, setDeleteConfirmFicha] = useState<{id: string, consecutivo: number} | null>(null)
   
   useEffect(() => {
-    if (showDetailModal || showNewIdConfirm || showImportModal) {
+    if (showDetailModal || showNewIdConfirm || showImportModal || showExportModal || showExportAlert) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -73,7 +78,7 @@ export function IdentificacionesModule() {
     return () => {
       document.body.style.overflow = '';
     }
-  }, [showDetailModal, showNewIdConfirm, showImportModal])
+  }, [showDetailModal, showNewIdConfirm, showImportModal, showExportModal, showExportAlert])
   
   // Mostrar aviso de vacío
   const [notifiedEmpty, setNotifiedEmpty] = useState(false)
@@ -152,10 +157,69 @@ export function IdentificacionesModule() {
   }
 
   const handleExport = async () => {
+    if (isEnfermeria() && !isAdmin && !isSuperAdmin) {
+      if (exportType === "range") {
+        if (!exportStart || !exportEnd) {
+          toast.error("Debe seleccionar una fecha de inicio y una de fin para descargar.");
+          setShowExportModal(false);
+          return;
+        }
+        
+        const start = new Date(exportStart);
+        const end = new Date(exportEnd);
+        const limitDate = new Date();
+        limitDate.setMonth(limitDate.getMonth() - 3);
+
+        if (start < limitDate) {
+          toast.error("No puede seleccionar una fecha anterior a 3 meses.");
+          setShowExportModal(false);
+          return;
+        }
+        if (end > new Date()) {
+          toast.error("La fecha final no puede ser superior a hoy.");
+          setShowExportModal(false);
+          return;
+        }
+      }
+
+      try {
+        const token = localStorage.getItem("salud-pereira-token")
+        const checkRes = await fetch("/api/download-limit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({ type: "identificaciones", action: "check" })
+        });
+        
+        if (!checkRes.ok) {
+           toast.error("Ocurrió un error verificando el límite de descargas. Intente de nuevo o avise a soporte.");
+           setShowExportModal(false);
+           return;
+        }
+
+        const checkData = await checkRes.json();
+        if (!checkData.allowed) {
+          toast.error(`Ya has descargado el excel. La descarga estará disponible la siguiente semana (${checkData.nextAvailable}).`, { duration: 5000 });
+          setShowExportModal(false);
+          setShowExportAlert(false);
+          return;
+        }
+      } catch (err) {
+        toast.error("Error validando permisos de descarga.");
+        setShowExportModal(false);
+        return;
+      }
+    }
+
     setExporting(true)
+    setShowExportModal(false)
+    setShowExportAlert(false)
     const toastId = toast.loading("Preparando exportación...")
     try {
-      const exportUrl = user ? `/api/identificaciones/exportar?role=${user.rol}&territorioId=${user.territorioId || ''}&userId=${user.id || ''}` : '/api/identificaciones/exportar'
+      let exportUrl = user ? `/api/identificaciones/exportar?role=${user.rol}&territorioId=${user.territorioId || ''}&userId=${user.id || ''}` : '/api/identificaciones/exportar'
+      if (exportType === "range") {
+        if (exportStart) exportUrl += `&startDate=${exportStart}`;
+        if (exportEnd) exportUrl += `&endDate=${exportEnd}`;
+      }
       
       const token = localStorage.getItem("salud-pereira-token");
       const response = await fetch(exportUrl, {
@@ -174,6 +238,15 @@ export function IdentificacionesModule() {
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
+      
+      if (isEnfermeria()) {
+        await fetch("/api/download-limit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({ type: "identificaciones", action: "update" })
+        });
+      }
+      
       toast.success("Exportación descargada", { id: toastId })
     } catch (e: any) {
       toast.error(e.message, { id: toastId })
@@ -300,15 +373,20 @@ export function IdentificacionesModule() {
                Importar CSV
              </button>
           )}
-          {(isSuperAdmin || isAdmin || isEnfermeria()) && (
+          {(isAdmin || isSuperAdmin || isEnfermeria()) && (
             <button
               disabled={exporting}
-              onClick={handleExport}
+              onClick={() => {
+                if (isEnfermeria() && !isAdmin && !isSuperAdmin) {
+                  setExportType("range");
+                }
+                setShowExportModal(true);
+              }}
               className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-50 w-full sm:w-auto text-center"
             >
               {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               <span className="whitespace-nowrap sm:whitespace-normal">
-                {user?.rol === 'auxiliar' ? 'Descargar Excel' : 'Descargar Todo'}
+                Descargar CSV
               </span>
             </button>
           )}
@@ -361,30 +439,32 @@ export function IdentificacionesModule() {
               )}
             </div>
           </div>
-          <select 
-            className="px-4 py-2.5 border rounded-xl text-sm font-semibold bg-background border-input outline-none focus:ring-2 focus:ring-primary min-w-[140px]"
-            value={qEstado}
-            onChange={e => setQEstado(e.target.value)}
-          >
-            <option value="">Cualquier Estado</option>
-            <option value="1">Efectivas</option>
-            <option value="2">No Efectivas</option>
-            <option value="3">Rechazadas / Negadas</option>
-          </select>
-
-          {isAuxiliar && (
-            <button
-              onClick={() => { setMyIdentifications(!myIdentifications); setPage(1); }}
-              className={`px-4 py-2.5 rounded-xl text-sm font-bold border transition-all flex items-center gap-2 ${
-                myIdentifications 
-                  ? 'bg-primary text-primary-foreground border-primary shadow-sm' 
-                  : 'bg-background text-foreground border-border hover:bg-muted'
-              }`}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <select 
+              className="flex-1 sm:flex-none px-4 py-2.5 border rounded-xl text-sm font-semibold bg-background border-input outline-none focus:ring-2 focus:ring-primary min-w-[140px]"
+              value={qEstado}
+              onChange={e => setQEstado(e.target.value)}
             >
-              <Users className="w-4 h-4" />
-              Mis Identificaciones
-            </button>
-          )}
+              <option value="">Cualquier Estado</option>
+              <option value="1">Efectivas</option>
+              <option value="2">No Efectivas</option>
+              <option value="3">Rechazadas / Negadas</option>
+            </select>
+
+            {isAuxiliar && (
+              <button
+                onClick={() => { setMyIdentifications(!myIdentifications); setPage(1); }}
+                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold border transition-all flex items-center justify-center gap-2 ${
+                  myIdentifications 
+                    ? 'bg-primary text-primary-foreground border-primary shadow-sm' 
+                    : 'bg-background text-foreground border-border hover:bg-muted'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span className="whitespace-nowrap">{myIdentifications ? "Mis ID" : "Mis ID"}</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* CONTENIDO TABULAR */}
@@ -534,7 +614,7 @@ export function IdentificacionesModule() {
                 </div>
               ) : selectedFichaDetail ? (
                 <>
-                  <div className="max-h-[85vh] overflow-y-auto relative print:hidden">
+                  <div className="max-h-[85vh] overflow-y-auto overflow-x-hidden relative print:hidden">
                     <ResumenFicha 
                       ficha={selectedFichaDetail} 
                       onClose={() => { setShowDetailModal(false); setSelectedFichaDetail(null); }} 
@@ -560,7 +640,7 @@ export function IdentificacionesModule() {
                     />
                   </div>
                   {/* Elemento reservado SÓLO para el momento crítico de imprimir */}
-                  <div className="fixed top-[-9999px] left-[-9999px] print:static print:top-auto print:left-auto print:block w-[1024px] print:w-full bg-white overflow-visible">
+                  <div className="fixed top-[-9999px] left-[-9999px] print:static print:top-auto print:left-auto print:block w-[1024px] print:w-[1024px] bg-white overflow-visible">
                     <FacturaFicha ficha={selectedFichaDetail} showOnScreen={false} />
                   </div>
                 </>
@@ -585,7 +665,7 @@ export function IdentificacionesModule() {
       {showNewIdConfirm && (
         <div 
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto w-full h-full"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowNewIdConfirm(false) }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowNewIdConfirm(false); setSelectedMicro(""); } }}
         >
           <div className="w-full max-w-md rounded-[2.5rem] bg-white p-8 shadow-2xl animate-in zoom-in-95 duration-300 border-none overflow-y-auto max-h-[90vh]">
             <div className="flex flex-col items-center text-center">
@@ -606,7 +686,9 @@ export function IdentificacionesModule() {
                   Selecciona el Microterritorio (MT)
                 </label>
                 <select 
-                  className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 bg-white font-bold text-slate-700 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all appearance-none cursor-pointer"
+                  className={`w-full px-3 sm:px-5 py-3 sm:py-4 rounded-2xl border-2 bg-white font-bold text-sm sm:text-base text-slate-700 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all appearance-none cursor-pointer text-ellipsis overflow-hidden ${
+                    !selectedMicro ? 'border-orange-200 text-slate-400 animate-pulse' : 'border-slate-200'
+                  }`}
                   value={selectedMicro}
                   onChange={(e) => setSelectedMicro(e.target.value)}
                   style={{
@@ -616,6 +698,7 @@ export function IdentificacionesModule() {
                     backgroundSize: '1.25rem'
                   }}
                 >
+                  <option value="" disabled hidden>Selecciona Microterritorio...</option>
                   {[1, 2, 3, 4].map((num) => (
                     <option key={num} value={`MT0${num}`}>
                       Microterritorio {num} (MT0{num})
@@ -629,17 +712,26 @@ export function IdentificacionesModule() {
 
               <div className="grid grid-cols-2 gap-4 w-full">
                 <button
-                  onClick={() => setShowNewIdConfirm(false)}
+                  onClick={() => { setShowNewIdConfirm(false); setSelectedMicro(""); }}
                   className="rounded-2xl border-2 border-slate-100 bg-white px-6 py-4 text-lg font-black text-slate-500 hover:bg-slate-50 hover:border-slate-200 transition-all cursor-pointer active:scale-95"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={() => {
+                    if (!selectedMicro) {
+                      toast.error("Por favor selecciona un microterritorio antes de iniciar")
+                      return
+                    }
                     setShowNewIdConfirm(false)
                     setIsWizardOpen(true)
                   }}
-                  className="rounded-2xl bg-orange-500 px-6 py-4 text-lg font-black text-white hover:bg-orange-600 shadow-lg shadow-orange-500/20 transition-all cursor-pointer active:scale-95"
+                  disabled={!selectedMicro}
+                  className={`rounded-2xl px-6 py-4 text-lg font-black text-white transition-all active:scale-95 ${
+                    !selectedMicro 
+                      ? 'bg-slate-300 cursor-not-allowed opacity-70' 
+                      : 'bg-orange-500 hover:bg-orange-600 shadow-lg shadow-orange-500/20 cursor-pointer'
+                  }`}
                 >
                   Sí, iniciar
                 </button>
@@ -716,6 +808,89 @@ export function IdentificacionesModule() {
         </div>
       )}
       
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm print:hidden">
+          <div className="bg-card w-full max-w-md rounded-2xl shadow-xl border border-border animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-foreground">Exportar Fichas / Identificaciones</h3>
+                <button onClick={() => setShowExportModal(false)} className="p-2 hover:bg-muted rounded-full transition-colors text-muted-foreground hover:text-foreground">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {(!isEnfermeria() || isAdmin || isSuperAdmin) && (
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-1 block">Tipo de Descarga</label>
+                    <select
+                      value={exportType}
+                      onChange={(e) => setExportType(e.target.value as "all" | "range")}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none"
+                    >
+                      <option value="all">Todo el historial</option>
+                      <option value="range">Rango de fechas</option>
+                    </select>
+                  </div>
+                )}
+
+                {(exportType === "range" || (isEnfermeria() && !isAdmin && !isSuperAdmin)) && (() => {
+                  const maxDateStr = new Date().toISOString().split("T")[0];
+                  const minDateObj = new Date();
+                  minDateObj.setMonth(minDateObj.getMonth() - 3);
+                  const minDateStr = minDateObj.toISOString().split("T")[0];
+                  
+                  return (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-foreground mb-1 block">Fecha Inicio</label>
+                        <input
+                          type="date"
+                          value={exportStart}
+                          min={isEnfermeria() && !isAdmin && !isSuperAdmin ? minDateStr : undefined}
+                          max={isEnfermeria() && !isAdmin && !isSuperAdmin ? maxDateStr : undefined}
+                          onChange={(e) => setExportStart(e.target.value)}
+                          className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-foreground mb-1 block">Fecha Fin</label>
+                        <input
+                          type="date"
+                          value={exportEnd}
+                          min={isEnfermeria() && !isAdmin && !isSuperAdmin ? minDateStr : undefined}
+                          max={isEnfermeria() && !isAdmin && !isSuperAdmin ? maxDateStr : undefined}
+                          onChange={(e) => setExportEnd(e.target.value)}
+                          className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none"
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="mt-8 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="rounded-xl border border-border bg-background px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleExport}
+                  disabled={exporting || (exportType === "range" && (!exportStart || !exportEnd))}
+                  className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+                >
+                  {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  {exporting ? "Descargando..." : "Descargar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         open={!!deleteConfirmFicha}

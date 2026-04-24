@@ -49,6 +49,8 @@ model User {
   recoveryCode          String?
   recoveryExpires       DateTime?
   telefono              String?
+  lastDownloadAtenciones DateTime?
+  lastDownloadIdentificaciones DateTime?
   atenciones            Atencion[]
   contratos             Contrato[]
   derivacionesRecibidas Derivacion[]              @relation("ProfesionalDerivacion")

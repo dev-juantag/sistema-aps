@@ -193,6 +193,25 @@ export async function POST(req: Request) {
 
     const finalIntegrantes = isEfectiva ? (integrantes || []) : [];
 
+    // Validación para prevenir Fichas Huérfanas (Robo de Integrantes)
+    if (finalIntegrantes.length > 0) {
+      const documentos = finalIntegrantes.map((int: any) => String(int.numDoc || '')).filter(Boolean);
+      if (documentos.length > 0) {
+        const pacientesExistentes = await prisma.paciente.findMany({
+          where: { documento: { in: documentos } },
+          select: { documento: true, ficha: { select: { numFamilia: true, id: true } } }
+        });
+        
+        if (pacientesExistentes.length > 0) {
+          const conflictos = pacientesExistentes.map((p: any) => `${p.documento} (Familia: ${p.ficha?.numFamilia || 'Desconocida'})`).join(', ');
+          return NextResponse.json({
+            success: false,
+            error: `No se puede guardar la ficha. Los siguientes documentos ya se encuentran registrados en otra identificación: ${conflictos}`
+          }, { status: 400 });
+        }
+      }
+    }
+
     const toIntArray = (arr: any): number[] => {
       const arrayToProcess = Array.isArray(arr) ? arr : (arr ? [arr] : [])
       return arrayToProcess.map((val: any) => parseInt(String(val))).filter((n: number) => !isNaN(n))

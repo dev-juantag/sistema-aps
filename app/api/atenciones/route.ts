@@ -43,17 +43,28 @@ export async function GET(req: Request) {
         whereClause.createdAt = { gte: settings.currentStageStart };
       }
       
-      // If user is precisely PROFESIONAL, force scope to themselves or their territory if isEnfermeria
       if (userRole === "PROFESIONAL") {
         if (isEnfermeria && currentUser?.territorioId) {
-          whereClause.profesional = {
-            territorioId: currentUser.territorioId
-          };
+          // Nursing leads see everything in their territory
+          // They can also filter by a specific professional if requested
+          if (requestedProfesionalId) {
+             whereClause.profesionalId = requestedProfesionalId;
+             // Ensure they only see professionals from their territory or atenciones in their territory
+             whereClause.OR = [
+               { territorioId: currentUser.territorioId },
+               { profesional: { territorioId: currentUser.territorioId } }
+             ];
+          } else {
+             whereClause.OR = [
+               { territorioId: currentUser.territorioId },
+               { profesional: { territorioId: currentUser.territorioId } }
+             ];
+          }
         } else {
+          // Regular professionals only see their own
           whereClause.profesionalId = userId;
         }
-      }
-      if (userRole === "FACTURADOR") {
+      } else if (userRole === "FACTURADOR") {
         const assignedTIds = currentUser?.territoriosAsignados?.map((t: any) => t.id) || [];
         
         if (assignedTIds.length > 0) {
@@ -67,12 +78,14 @@ export async function GET(req: Request) {
             { profesional: { territorioId: currentUser.territorioId } }
           ];
         } else {
-          // Si es facturador pero no tiene territorios asignados, mostrar nada (seguridad)
           whereClause.territorioId = "NONE";
         }
+      } else {
+        // Other roles (Auxiliar?) might be restricted to their own ID if they can even access this
+        whereClause.profesionalId = userId;
       }
-
-      // Admins can filter by specific profesional if they want
+    } else {
+      // Admins and SuperAdmins can filter by specific profesional if they want
       if (requestedProfesionalId) {
         whereClause.profesionalId = requestedProfesionalId;
       }

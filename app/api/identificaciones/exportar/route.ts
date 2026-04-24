@@ -84,6 +84,15 @@ export async function GET(request: Request) {
       if (territorioId) whereClause.territorioId = territorioId
     }
 
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
+
+    if (startDate || endDate) {
+      whereClause.createdAt = {}
+      if (startDate) whereClause.createdAt.gte = new Date(`${startDate}T00:00:00.000Z`)
+      if (endDate) whereClause.createdAt.lte = new Date(`${endDate}T23:59:59.999Z`)
+    }
+
     const fichas = await prisma.fichaHogar.findMany({
       where: whereClause,
       include: {

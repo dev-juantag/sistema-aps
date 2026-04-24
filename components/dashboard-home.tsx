@@ -617,38 +617,38 @@ export function DashboardHome() {
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Pirámide Poblacional */}
             <div className="rounded-xl border border-border bg-card p-6 shadow-sm flex flex-col items-center">
-              <div className="w-full mb-4 flex items-center justify-between">
+              <div className="w-full mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Layers className="h-5 w-5 text-primary" />
                   <h2 className="text-lg font-semibold text-foreground">
                     Cursos de Vida y Género
                   </h2>
                 </div>
-                <div className="flex items-center gap-3 text-[11px]">
-                   <div className="flex items-center gap-1">
-                     <div className="w-2 h-2 rounded-full bg-[#081e69]"></div>
+                <div className="flex flex-wrap items-center gap-3 text-[11px] bg-muted/10 p-2 rounded-lg sm:bg-transparent sm:p-0">
+                   <div className="flex items-center gap-1.5">
+                     <div className="w-2.5 h-2.5 rounded-full bg-[#081e69]"></div>
                      <span className="font-bold">HOMBRES: {idStats?.kpis?.totalHombres || 0}</span>
                    </div>
-                   <div className="flex items-center gap-1">
-                     <div className="w-2 h-2 rounded-full bg-[#eb3b5a]"></div>
+                   <div className="flex items-center gap-1.5">
+                     <div className="w-2.5 h-2.5 rounded-full bg-[#eb3b5a]"></div>
                      <span className="font-bold">MUJERES: {idStats?.kpis?.totalMujeres || 0}</span>
                    </div>
                 </div>
               </div>
-              <div className="w-full h-[300px]">
+              <div className="w-full h-[320px]">
                 {(idStats?.piramide?.length || 0) > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart layout="vertical" data={idStats?.piramide || []} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+                    <BarChart layout="vertical" data={idStats?.piramide || []} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="oklch(0.9 0.02 285)" />
                       <XAxis type="number" hide />
-                      <YAxis dataKey="label" type="category" width={120} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
+                      <YAxis dataKey="label" type="category" width={100} tick={{ fontSize: 9, fontWeight: 'bold', fill: "var(--foreground)" }} />
                       <Tooltip
                         cursor={{ fill: 'transparent' }}
                         contentStyle={{ backgroundColor: "var(--card)", borderRadius: "12px", border: "1px solid var(--border)", boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)" }}
                         formatter={(value: any, name: string) => [Math.abs(value), name === "mujeres" ? "Mujeres" : "Hombres"]}
                       />
-                      <Bar dataKey="hombres" name="Hombres" fill="#081e69" stackId="a" radius={[0, 4, 4, 0]} barSize={20} />
-                      <Bar dataKey="mujeres" name="Mujeres" fill="#eb3b5a" stackId="a" radius={[4, 0, 0, 4]} barSize={20} />
+                      <Bar dataKey="hombres" name="Hombres" fill="#081e69" stackId="a" radius={[0, 4, 4, 0]} barSize={24} />
+                      <Bar dataKey="mujeres" name="Mujeres" fill="#eb3b5a" stackId="a" radius={[4, 0, 0, 4]} barSize={24} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (

@@ -176,7 +176,7 @@ const GenogramEdge = ({
 
 
 
-function PrintHandler({ setPrintImage }: { setPrintImage: (url: string) => void }) {
+function PrintHandler({ setPrintImage, containerId }: { setPrintImage: (url: string) => void, containerId: string }) {
 
   const { fitView } = useReactFlow();
   
@@ -185,7 +185,8 @@ function PrintHandler({ setPrintImage }: { setPrintImage: (url: string) => void 
     const timeout = setTimeout(() => {
       fitView({ padding: 0.35, duration: 0 });
       
-      const reactFlowElement = document.querySelector('.react-flow') as HTMLElement;
+      const container = document.getElementById(containerId);
+      const reactFlowElement = container?.querySelector('.react-flow') as HTMLElement;
       if (reactFlowElement) {
         toSvg(reactFlowElement, { 
           backgroundColor: '#ffffff',
@@ -201,13 +202,14 @@ function PrintHandler({ setPrintImage }: { setPrintImage: (url: string) => void 
     }, 800);
 
     return () => clearTimeout(timeout);
-  }, [fitView, setPrintImage]);
+  }, [fitView, setPrintImage, containerId]);
 
   return null;
 }
 
 export default function FamiliogramaStaticViewer({ jsonString, isPrintView = false }: { jsonString: string, isPrintView?: boolean }) {
   const [printImage, setPrintImage] = useState<string | null>(null);
+  const containerId = useMemo(() => `familiograma-print-${Math.random().toString(36).substr(2, 9)}`, []);
 
   const { nodes, edges } = useMemo(() => {
     try {
@@ -234,7 +236,7 @@ export default function FamiliogramaStaticViewer({ jsonString, isPrintView = fal
   }
 
   return (
-    <div className="familiograma-print-container relative w-full h-[600px] bg-white rounded-xl border border-gray-200 overflow-hidden print:border-0 print:h-auto print:bg-white print:overflow-visible flex flex-col justify-center items-center" 
+    <div id={containerId} className="familiograma-print-container relative w-full h-[600px] bg-white rounded-xl border border-gray-200 overflow-hidden print:border-0 print:h-auto print:bg-white print:overflow-visible flex flex-col justify-center items-center" 
       style={{ 
         pageBreakInside: 'avoid',
         breakInside: 'avoid'
@@ -292,7 +294,7 @@ export default function FamiliogramaStaticViewer({ jsonString, isPrintView = fal
             minZoom={0.05}
             maxZoom={1.5}
           >
-            {isPrintView && <PrintHandler setPrintImage={setPrintImage} />}
+            {isPrintView && <PrintHandler setPrintImage={setPrintImage} containerId={containerId} />}
           </ReactFlow>
         </ReactFlowProvider>
       </div>
