@@ -158,6 +158,7 @@ model FichaHogar {
   familiogramaCodigo    String?
   encuestadorNombreRaw  String?
   encuestadorDocRaw     String?
+  otrosJson             Json?
   puedeActualizarse     Boolean      @default(false)
   derivaciones          Derivacion[]
   encuestador           User?        @relation(fields: [encuestadorId], references: [id])
@@ -212,6 +213,8 @@ model Paciente {
   tipoHijo                 String?
   tipoPareja               String?
   barrerasAcceso           Int[]
+  barrerasAccesoOtro       String?
+  otrosJson                Json?
   atenciones               Atencion[]
   derivaciones             Derivacion[]
   ficha                    FichaHogar?  @relation(fields: [fichaId], references: [id], onDelete: Cascade)

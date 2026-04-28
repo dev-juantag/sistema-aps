@@ -281,6 +281,14 @@ export async function POST(req: Request) {
       zarit: isEfectiva ? (hogarData.zarit ? parseInt(hogarData.zarit) : null) : null,
       vulnerabilidades: isEfectiva ? (Array.isArray(hogarData.vulnerabilidades) ? hogarData.vulnerabilidades : []) : [],
       familiogramaCodigo: isEfectiva && hogarData.familiogramaCodigo ? hogarData.familiogramaCodigo : (finalIntegrantes.length > 0 ? generateFamiliogramaAutoLayout(finalIntegrantes) : null),
+      otrosJson: {
+        fuenteAguaOtro: hogarData.fuenteAguaOtro || null,
+        dispExcretasOtro: hogarData.dispExcretasOtro || null,
+        aguasResidualesOtro: hogarData.aguasResidualesOtro || null,
+        dispResiduosOtro: hogarData.dispResiduosOtro || null,
+        riesgoAccidenteOtro: hogarData.riesgoAccidenteOtro || null,
+        animalesOtro: hogarData.animalesOtro || null,
+      }
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -328,6 +336,13 @@ export async function POST(req: Request) {
             enfermedadAguda: Boolean(int.enfermedadAguda),
             recibeAtencionMedica: Boolean(int.recibeAtencionMedica),
             remisiones: Array.isArray(int.remisiones) ? int.remisiones.map((r: any) => String(r)) : [],
+            barrerasAccesoOtro: int.barrerasAccesoOtro || null,
+            otrosJson: {
+              grupoPoblacionalOtro: int.grupoPoblacionalOtro || null,
+              discapacidadesOtro: int.discapacidadesOtro || null,
+              antecedentesOtro: int.antecedentesOtro || null,
+              antecTransmisiblesOtro: int.antecTransmisiblesOtro || null,
+            }
           } as any
 
           await tx.paciente.upsert({

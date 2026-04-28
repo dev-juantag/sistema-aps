@@ -8,6 +8,7 @@ import {
   REMISIONES_APS, DIAGNOSTICO_NUTRICIONAL, calcularEdad
 } from '@/lib/constants'
 import { inp, sel, lbl, lblStyle, chk, chkLabel } from './wizardStyles'
+import { F, Multi } from './wizardComponents'
 
 export default function Step5Salud() {
   const { register, control, watch, formState: { errors } } = useFormContext()
@@ -57,28 +58,20 @@ export default function Step5Salud() {
               <div className="p-4 space-y-4 bg-white">
 
                 {/* Antecedentes Crónicos */}
-                <FS title="Antecedentes Patológicos Crónicos">
-                  <div className="grid grid-cols-2 gap-1">
-                    {ANTECEDENTES_CRONICOS.map(a => (
-                      <label key={a.id} className={chkLabel}>
-                        <input type="checkbox" {...register(`integrantes.${i}.antecedentes.${a.id}`)} className={chk} />
-                        <span className="text-xs leading-tight">{a.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </FS>
+                <Multi 
+                  label="Antecedentes Patológicos Crónicos" 
+                  options={ANTECEDENTES_CRONICOS} 
+                  name={`integrantes.${i}.antecedentes`} 
+                  register={register} 
+                />
 
                 {/* Transmisibles */}
-                <FS title="Enfermedades Transmisibles">
-                  <div className="grid grid-cols-2 gap-1">
-                    {ANTECEDENTES_TRANSMISIBLES.map(a => (
-                      <label key={a.id} className={chkLabel}>
-                        <input type="checkbox" {...register(`integrantes.${i}.antecTransmisibles.${a.id}`)} className={chk} />
-                        <span className="text-xs leading-tight">{a.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </FS>
+                <Multi 
+                  label="Enfermedades Transmisibles" 
+                  options={ANTECEDENTES_TRANSMISIBLES} 
+                  name={`integrantes.${i}.antecTransmisibles`} 
+                  register={register} 
+                />
 
                 {/* Antropometría */}
                 <FS title="Medidas Antropométricas">
@@ -133,16 +126,12 @@ export default function Step5Salud() {
                 </FS>
 
                 {/* Intervenciones */}
-                <FS title="Intervenciones Pendientes">
-                  <div className="grid grid-cols-2 gap-1">
-                    {INTERVENCIONES_PENDIENTES.map(o => (
-                      <label key={o.id} className={chkLabel}>
-                        <input type="checkbox" value={o.id} {...register(`integrantes.${i}.intervencionesPendientes`)} className={chk} />
-                        <span className="text-xs leading-tight">{o.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </FS>
+                <Multi 
+                  label="Intervenciones Pendientes" 
+                  options={INTERVENCIONES_PENDIENTES} 
+                  name={`integrantes.${i}.intervencionesPendientes`} 
+                  register={register} 
+                />
 
                 {/* Enfermedad Aguda */}
                 <FS title="Enfermedad Aguda">
@@ -161,16 +150,12 @@ export default function Step5Salud() {
                 </FS>
 
                 {/* Remisiones APS */}
-                <FS title="Remisiones APS">
-                  <div className="grid grid-cols-2 gap-1">
-                    {REMISIONES_APS.map(o => (
-                      <label key={o.id} className={chkLabel}>
-                        <input type="checkbox" value={o.id} {...register(`integrantes.${i}.remisiones`)} className={chk} />
-                        <span className="text-xs leading-tight">{o.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </FS>
+                <Multi 
+                  label="Remisiones APS" 
+                  options={REMISIONES_APS} 
+                  name={`integrantes.${i}.remisiones`} 
+                  register={register} 
+                />
 
               </div>
             )}
@@ -192,13 +177,4 @@ function FS({ title, children }: { title: string; children: React.ReactNode }) {
   )
 }
 
-function F({ label, children, required }: { label: string; children: React.ReactNode, required?: boolean }) {
-  return (
-    <div className="space-y-1">
-      <label className={lbl} style={lblStyle}>
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      {children}
-    </div>
-  )
-}
+

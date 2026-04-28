@@ -4,6 +4,7 @@ import { useFormContext } from 'react-hook-form'
 import { Info, MapPin, Crosshair } from 'lucide-react'
 import { ESTADO_VISITA, TIPO_DOCUMENTO_ENCUESTADOR, PERFIL_ENCUESTADOR } from '@/lib/constants'
 import { inp, sel, card, cardBorder, lbl, lblStyle, required as reqStyle, chk, chkLabel, btnGreen, btnGreenStyle } from './wizardStyles'
+import MapLocationPicker from '@/components/ui/MapLocationPicker'
 
 export default function Step1InfoGeneral() {
   const { register, setValue, watch } = useFormContext()
@@ -56,7 +57,7 @@ export default function Step1InfoGeneral() {
             <input {...register('microterritorio')} readOnly className={`${inp} bg-gray-100 cursor-not-allowed text-gray-600 font-bold`} />
           </F>
           <F label="UZPE">
-            <input {...register('uzpe')} placeholder="UZPE" className={inp} />
+            <input {...register('uzpe')} placeholder="UZPE" readOnly className={`${inp} bg-gray-100 cursor-not-allowed text-gray-600 font-bold`} />
           </F>
           <F label="Centro Poblado / Barrio" required>
             <input {...register('centroPoblado')} placeholder="Nombre del sector" className={inp} />
@@ -65,29 +66,39 @@ export default function Step1InfoGeneral() {
             <input {...register('direccion')} placeholder="CR 12 # 34-56" className={inp} maxLength={200} />
           </F>
           <F label="Descripción de la Ubicación" className="sm:col-span-2">
-            <textarea {...register('descripcionUbicacion')} placeholder="Frente a la panadería, casa de portón verde, subir por las escaleras..." className={`${inp} min-h-[60px] resize-y`} />
+            <textarea {...register('descripcionUbicacion')} placeholder="Frente a la panadería, casa de portón verde, subir por las escaleras..." className={`${inp} min-h-[70px] resize-y`} />
           </F>
         </div>
 
-        {/* GPS */}
-        <div className="rounded-lg p-3 space-y-2" style={{ background: '#f0f4ff', border: '1px solid #c7d4f0' }}>
-          <p className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: '#081e69' }}>
-            <Crosshair className="w-3.5 h-3.5" style={{ color: '#0a8c32' }} /> Georreferenciación
-          </p>
-          <button type="button" onClick={handleGPS} className={btnGreen} style={btnGreenStyle}>
-            Capturar coordenadas GPS
-          </button>
-          {lat && lng && (
-            <p className="text-[11px] font-sans px-2 py-1 rounded" style={{ color: '#0a8c32', background: '#e8f5ec' }}>
-              ✓ {lat}, {lng}
-            </p>
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            <F label="Latitud">
-              <input {...register('latitud')} placeholder="-6.123456" type="number" step="any" className={inp} />
+        {/* GPS y Mapa */}
+        <div className="rounded-xl p-4 sm:col-span-2 space-y-4" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <p className="text-sm font-black flex items-center gap-2" style={{ color: '#081e69' }}>
+                <Crosshair className="w-4 h-4 text-orange-500" /> Georreferenciación Exacta
+              </p>
+              <p className="text-xs text-slate-500 font-medium max-w-lg mt-1">
+                Haz clic sobre el mapa para ajustar la ubicación exacta de la vivienda.
+              </p>
+            </div>
+            <button type="button" onClick={handleGPS} className={btnGreen} style={{...btnGreenStyle, width: 'auto', padding: '0.5rem 1rem'}}>
+              Usar mi GPS actual
+            </button>
+          </div>
+
+          <MapLocationPicker 
+            lat={lat} 
+            lng={lng} 
+            setFieldValue={setValue} 
+            searchQuery={`${watch('centroPoblado') || ''} ${watch('direccion') || ''}`.trim()} 
+          />
+
+          <div className="grid grid-cols-2 gap-3 mt-2">
+            <F label="Latitud (Auto)">
+              <input {...register('latitud')} readOnly placeholder="-6.123456" className={`${inp} bg-slate-100 font-mono text-xs cursor-not-allowed`} />
             </F>
-            <F label="Longitud">
-              <input {...register('longitud')} placeholder="-75.123456" type="number" step="any" className={inp} />
+            <F label="Longitud (Auto)">
+              <input {...register('longitud')} readOnly placeholder="-75.123456" className={`${inp} bg-slate-100 font-mono text-xs cursor-not-allowed`} />
             </F>
           </div>
         </div>

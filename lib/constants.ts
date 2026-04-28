@@ -113,6 +113,7 @@ export const FUENTE_AGUA = [
   { id: 7, label: 'Fuente natural (río, quebrada, nacimiento)' },
   { id: 8, label: 'Agua embotellada o en bolsa' },
   { id: 9, label: 'Otro' },
+  { id: 99, label: 'Ninguno' },
 ]
 
 export const DISPOSICION_EXCRETAS = [
@@ -121,7 +122,8 @@ export const DISPOSICION_EXCRETAS = [
   { id: 3, label: 'Inodoro sin conexión' },
   { id: 4, label: 'Letrina' },
   { id: 5, label: 'Bajamar' },
-  { id: 6, label: 'No tiene' },
+  { id: 6, label: 'No tiene / Ninguno' },
+  { id: 7, label: 'Otro' },
 ]
 
 export const AGUAS_RESIDUALES = [
@@ -130,6 +132,7 @@ export const AGUAS_RESIDUALES = [
   { id: 3, label: 'Vertimiento a fuente hídrica' },
   { id: 4, label: 'A campo abierto' },
   { id: 5, label: 'Otro' },
+  { id: 99, label: 'Ninguno' },
 ]
 
 export const DISPOSICION_RESIDUOS = [
@@ -139,6 +142,8 @@ export const DISPOSICION_RESIDUOS = [
   { id: 4, label: 'Arrojo a fuente hídrica' },
   { id: 5, label: 'Basura a campo abierto' },
   { id: 6, label: 'Reciclaje / Aprovechamiento' },
+  { id: 7, label: 'Otro' },
+  { id: 99, label: 'Ninguno' },
 ]
 
 export const RIESGO_ACCIDENTE = [
@@ -149,6 +154,7 @@ export const RIESGO_ACCIDENTE = [
   { id: 5, label: 'Objetos cortopunzantes' },
   { id: 6, label: 'Hacinamiento' },
   { id: 7, label: 'Ninguno' },
+  { id: 8, label: 'Otro' },
 ]
 
 export const FUENTE_ENERGIA = [
@@ -338,6 +344,7 @@ export const ANTECEDENTES_CRONICOS = [
   { id: 'renal', label: 'Enfermedad renal crónica' },
   { id: 'huerfana', label: 'Enfermedad huérfana / rara' },
   { id: 'salud_mental', label: 'Trastorno de salud mental' },
+  { id: 'otro', label: 'Otro' },
   { id: 'ninguno', label: 'Ninguno' },
 ]
 
@@ -349,6 +356,7 @@ export const ANTECEDENTES_TRANSMISIBLES = [
   { id: 'chagas', label: 'Enfermedad de Chagas' },
   { id: 'vih', label: 'VIH / SIDA' },
   { id: 'hepatitis', label: 'Hepatitis B / C' },
+  { id: 'otro', label: 'Otro' },
   { id: 'ninguno', label: 'Ninguno' },
 ]
 

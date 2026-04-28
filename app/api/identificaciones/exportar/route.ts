@@ -110,18 +110,18 @@ export async function GET(request: Request) {
       'fechaDiligenciamiento', 'encuestadorNombre', 'encuestadorDoc', 
       // VIVIENDA
       'tipoVivienda', 'matParedes', 'matPisos', 'matTechos', 'numHogares', 'numDormitorios', 
-      'estratoSocial', 'hacinamiento', 'fuenteAgua', 'dispExcretas', 'aguasResiduales', 
-      'dispResiduos', 'riesgoAccidente', 'fuenteEnergia', 'presenciaVectores', 'animales', 
+      'estratoSocial', 'hacinamiento', 'fuenteAgua', 'fuenteAguaOtro', 'dispExcretas', 'dispExcretasOtro', 'aguasResiduales', 'aguasResidualesOtro', 
+      'dispResiduos', 'dispResiduosOtro', 'riesgoAccidente', 'riesgoAccidenteOtro', 'fuenteEnergia', 'presenciaVectores', 'animales', 'animalesOtro',
       'cantAnimales', 'vacunacionMascotas',
       // FAMILIA
       'tipoFamilia', 'numIntegrantes', 'apgar', 'apgar_P1', 'apgar_P2', 'apgar_P3', 'apgar_P4', 'apgar_P5', 'ecomapa', 'cuidadorPrincipal', 'zarit', 'vulnerabilidades',
       // INTEGRANTES
       'pacienteId', 'nombres', 'apellidos', 'tipoDoc', 'documento', 'fechaNacimiento', 'sexo',
       'generoIdentidad', 'parentesco', 'gestante', 'mesesGestacion', 'telefono', 'nivelEducativo',
-      'ocupacion', 'regimen', 'eapb', 'etnia', 'puebloIndigena', 'grupoPoblacional', 'discapacidades',
+      'ocupacion', 'regimen', 'eapb', 'etnia', 'puebloIndigena', 'grupoPoblacional', 'grupoPoblacionalOtro', 'discapacidades', 'discapacidadesOtro', 'barrerasAccesoOtro',
       'peso', 'talla', 'perimetroBraquial', 'diagNutricional', 'practicaDeportiva', 'lactanciaMaterna',
       'lactanciaMeses', 'esquemaAtenciones', 'esquemaVacunacion', 'intervencionesPendientes',
-      'enfermedadAguda', 'recibeAtencionMedica', 'remisiones', 'antecedentesCronicos', 'antecedentesTransmisibles'
+      'enfermedadAguda', 'recibeAtencionMedica', 'remisiones', 'antecedentesCronicos', 'antecedentesOtro', 'antecedentesTransmisibles', 'antecTransmisiblesOtro'
     ]
 
     const rows: string[] = []
@@ -159,13 +159,19 @@ export async function GET(request: Request) {
         cleanCsv(f.estratoSocial),
         cleanCsv(f.hacinamiento ? 'SI' : 'NO'),
         getLabels(FUENTE_AGUA, f.fuenteAgua),
+        cleanCsv((f as any).otrosJson?.fuenteAguaOtro),
         getLabels(DISPOSICION_EXCRETAS, f.dispExcretas),
+        cleanCsv((f as any).otrosJson?.dispExcretasOtro),
         getLabels(AGUAS_RESIDUALES, f.aguasResiduales),
+        cleanCsv((f as any).otrosJson?.aguasResidualesOtro),
         getLabels(DISPOSICION_RESIDUOS, f.dispResiduos),
+        cleanCsv((f as any).otrosJson?.dispResiduosOtro),
         getLabels(RIESGO_ACCIDENTE, f.riesgoAccidente),
+        cleanCsv((f as any).otrosJson?.riesgoAccidenteOtro),
         cleanCsv(getLabel(FUENTE_ENERGIA, f.fuenteEnergia)),
         cleanCsv(f.presenciaVectores ? 'SI' : 'NO'),
         getLabels(ANIMALES, f.animales),
+        cleanCsv((f as any).otrosJson?.animalesOtro),
         cleanCsv(f.cantAnimales),
         cleanCsv(f.vacunacionMascotas ? 'SI' : 'NO'),
         // FAMILIA
@@ -208,7 +214,10 @@ export async function GET(request: Request) {
               cleanCsv(getLabel(ETNIA, p.etnia)),
               cleanCsv(p.puebloIndigena),
               getLabels(GRUPO_POBLACIONAL, p.grupoPoblacional),
+              cleanCsv((p as any).otrosJson?.grupoPoblacionalOtro),
               getLabels(DISCAPACIDADES, p.discapacidades),
+              cleanCsv((p as any).otrosJson?.discapacidadesOtro),
+              cleanCsv((p as any).barrerasAccesoOtro),
               cleanCsv(p.peso, true),
               cleanCsv(p.talla, true),
               cleanCsv(p.perimetroBraquial, true),
@@ -223,7 +232,9 @@ export async function GET(request: Request) {
               cleanCsv(p.recibeAtencionMedica ? 'SI' : 'NO'),
               getLabels(REMISIONES_APS, p.remisiones),
               getLabels(ANTECEDENTES_CRONICOS, p.antecedentes),
-              getLabels(ANTECEDENTES_TRANSMISIBLES, p.antecTransmisibles)
+              cleanCsv((p as any).otrosJson?.antecedentesOtro),
+              getLabels(ANTECEDENTES_TRANSMISIBLES, p.antecTransmisibles),
+              cleanCsv((p as any).otrosJson?.antecTransmisiblesOtro)
             ]
 
             rows.push([...baseRowData, ...patientRowData].join(';'))

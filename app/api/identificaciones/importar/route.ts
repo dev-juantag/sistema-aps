@@ -286,7 +286,15 @@ export async function POST(req: Request) {
           ecomapa: safeInt(get(h, 'ecomapa', 'ecomapa'), ECOMAPA_OPCIONES),
           cuidadorPrincipal: getBoolean(get(h, 'cuidador', 'cuidadorprincipal')),
           zarit: safeInt(get(h, 'escalaZARIT', 'escalazarit', 'zarit'), ZARIT_OPCIONES),
-          vulnerabilidades: safeIntArray(get(h, 'Vulnerabilidad', 'vulnerabilidad'), VULNERABILIDADES)
+          vulnerabilidades: safeIntArray(get(h, 'Vulnerabilidad', 'vulnerabilidad'), VULNERABILIDADES),
+          otrosJson: {
+            fuenteAguaOtro: get(h, 'fuenteAguaOtro', 'fuenteaguaotro') || null,
+            dispExcretasOtro: get(h, 'dispExcretasOtro', 'dispexcretasotro') || null,
+            aguasResidualesOtro: get(h, 'aguasResidualesOtro', 'aguasresidualesotro') || null,
+            dispResiduosOtro: get(h, 'dispResiduosOtro', 'dispresiduosotro') || null,
+            riesgoAccidenteOtro: get(h, 'riesgoAccidenteOtro', 'riesgoaccidenteotro') || null,
+            animalesOtro: get(h, 'animalesOtro', 'animalesotro') || null,
+          }
         }
 
         let ficha
@@ -363,6 +371,13 @@ export async function POST(req: Request) {
             remisiones: safeIntArray(get(int, 'remisiones'), REMISIONES_APS).map(String),
             antecedentes: safeIntArray(get(int, 'antecedentesCronicos', 'antecedentes'), ANTECEDENTES_CRONICOS),
             antecTransmisibles: safeIntArray(get(int, 'antecedentesTransmisibles', 'antectransmisibles'), ANTECEDENTES_TRANSMISIBLES),
+            barrerasAccesoOtro: get(int, 'barrerasAccesoOtro', 'barrerasaccesootro') || null,
+            otrosJson: {
+              grupoPoblacionalOtro: get(int, 'grupoPoblacionalOtro', 'grupopoblacionalotro') || null,
+              discapacidadesOtro: get(int, 'discapacidadesOtro', 'discapacidadesotro') || null,
+              antecedentesOtro: get(int, 'antecedentesOtro', 'antecedentesotro') || null,
+              antecTransmisiblesOtro: get(int, 'antecTransmisiblesOtro', 'antectransmisiblesotro') || null,
+            },
             fichaId: ficha.id,
           }
 

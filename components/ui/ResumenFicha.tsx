@@ -1,5 +1,11 @@
 import { ArrowLeft, Printer, MapPin, Info, Home, Users, Activity, Stethoscope, FileText, Network, Edit, Phone } from 'lucide-react'
-import { ESTADO_VISITA, APGAR_OPCIONES, calcularEdad } from '@/lib/constants'
+import { 
+  ESTADO_VISITA, APGAR_OPCIONES, calcularEdad, 
+  FUENTE_AGUA, DISPOSICION_EXCRETAS, AGUAS_RESIDUALES, 
+  DISPOSICION_RESIDUOS, RIESGO_ACCIDENTE, ANIMALES,
+  GRUPO_POBLACIONAL, DISCAPACIDADES, BARRERAS_ACCESO,
+  ANTECEDENTES_CRONICOS, ANTECEDENTES_TRANSMISIBLES
+} from '@/lib/constants'
 import FamiliogramaViewer from './FamiliogramaViewer'
 
 import { useState } from 'react'
@@ -292,6 +298,40 @@ export default function ResumenFicha({
               <p className="font-bold text-gray-800 text-xl">{ficha.numIntegrantes || ficha.pacientes?.length || 0}</p>
             </div>
           </div>
+
+          <div className="mt-8 pt-6 border-t border-gray-100">
+            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Servicios y Saneamiento</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                { label: 'Fuente de Agua', vals: ficha.fuenteAgua, catalog: FUENTE_AGUA, otro: ficha.otrosJson?.fuenteAguaOtro },
+                { label: 'Disp. Excretas', vals: ficha.dispExcretas, catalog: DISPOSICION_EXCRETAS, otro: ficha.otrosJson?.dispExcretasOtro },
+                { label: 'Aguas Residuales', vals: ficha.aguasResiduales, catalog: AGUAS_RESIDUALES, otro: ficha.otrosJson?.aguasResidualesOtro },
+                { label: 'Residuos Sólidos', vals: ficha.dispResiduos, catalog: DISPOSICION_RESIDUOS, otro: ficha.otrosJson?.dispResiduosOtro },
+                { label: 'Riesgos Vivienda', vals: ficha.riesgoAccidente, catalog: RIESGO_ACCIDENTE, otro: ficha.otrosJson?.riesgoAccidenteOtro },
+                { label: 'Animales/Mascotas', vals: ficha.animales, catalog: ANIMALES, otro: ficha.otrosJson?.animalesOtro }
+              ].map((item, idx) => (
+                <div key={idx} className="bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                  <p className="text-[9px] font-black text-blue-500 uppercase tracking-tighter mb-1.5">{item.label}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {Array.isArray(item.vals) && item.vals.length > 0 ? (
+                      item.vals.map((v: any) => (
+                        <span key={v} className="bg-white border border-gray-200 text-gray-700 text-[10px] px-1.5 py-0.5 rounded font-medium">
+                          {getLabel(item.catalog, v)}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-gray-400 text-[10px] italic">No registrado</span>
+                    )}
+                    {item.otro && (
+                      <span className="bg-blue-50 border border-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded font-bold italic">
+                        Otro: {item.otro}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
         )}
 
@@ -357,7 +397,81 @@ export default function ResumenFicha({
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                       <div className="bg-gray-50/50 p-3 rounded-lg">
+                          <p className="text-[9px] font-black text-gray-400 uppercase mb-2">Condiciones Diferenciales</p>
+                          <div className="flex flex-wrap gap-1.5">
+                             {pac.grupoPoblacional?.map((g: any) => (
+                               <span key={g} className="bg-white border border-gray-200 text-[10px] px-2 py-0.5 rounded text-gray-600">
+                                 {getLabel(GRUPO_POBLACIONAL, g)}
+                               </span>
+                             ))}
+                             {pac.otrosJson?.grupoPoblacionalOtro && (
+                               <span className="bg-blue-50 border border-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-bold">
+                                 Otro: {pac.otrosJson.grupoPoblacionalOtro}
+                               </span>
+                             )}
+                          </div>
+                       </div>
+                       <div className="bg-gray-50/50 p-3 rounded-lg">
+                          <p className="text-[9px] font-black text-gray-400 uppercase mb-2">Barreras y Discapacidad</p>
+                          <div className="flex flex-wrap gap-1.5">
+                             {pac.barrerasAcceso?.map((b: any) => (
+                               <span key={b} className="bg-red-50 border border-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded">
+                                 Barrera: {getLabel(BARRERAS_ACCESO, b)}
+                               </span>
+                             ))}
+                             {pac.barrerasAccesoOtro && (
+                               <span className="bg-red-50 border border-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-bold">
+                                 Otro: {pac.barrerasAccesoOtro}
+                               </span>
+                             )}
+                             {pac.discapacidades?.map((d: any) => (
+                               <span key={d} className="bg-amber-50 border border-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded">
+                                 Discap: {getLabel(DISCAPACIDADES, d)}
+                               </span>
+                             ))}
+                             {pac.otrosJson?.discapacidadesOtro && (
+                               <span className="bg-amber-50 border border-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-bold">
+                                 Otro: {pac.otrosJson.discapacidadesOtro}
+                               </span>
+                             )}
+                          </div>
+                       </div>
+                    </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                       <div className="bg-blue-50/30 p-3 rounded-lg border border-blue-100/50">
+                          <p className="text-[9px] font-black text-blue-600 uppercase mb-2">Antecedentes Crónicos</p>
+                          <div className="flex flex-wrap gap-1.5">
+                             {Array.isArray(pac.antecedentes) && pac.antecedentes.map((a: any) => (
+                               <span key={a} className="bg-white border border-blue-200 text-blue-800 text-[10px] px-2 py-0.5 rounded">
+                                 {getLabel(ANTECEDENTES_CRONICOS, a)}
+                               </span>
+                             ))}
+                             {pac.otrosJson?.antecedentesOtro && (
+                               <span className="bg-blue-100 border border-blue-200 text-blue-900 text-[10px] px-2 py-0.5 rounded font-bold">
+                                 Otro: {pac.otrosJson.antecedentesOtro}
+                               </span>
+                             )}
+                          </div>
+                       </div>
+                       <div className="bg-teal-50/30 p-3 rounded-lg border border-teal-100/50">
+                          <p className="text-[9px] font-black text-teal-600 uppercase mb-2">Antecedentes Transmisibles</p>
+                          <div className="flex flex-wrap gap-1.5">
+                             {Array.isArray(pac.antecTransmisibles) && pac.antecTransmisibles.map((t: any) => (
+                               <span key={t} className="bg-white border border-teal-200 text-teal-800 text-[10px] px-2 py-0.5 rounded">
+                                 {getLabel(ANTECEDENTES_TRANSMISIBLES, t)}
+                               </span>
+                             ))}
+                             {pac.otrosJson?.antecTransmisiblesOtro && (
+                               <span className="bg-teal-100 border border-teal-200 text-teal-900 text-[10px] px-2 py-0.5 rounded font-bold">
+                                 Otro: {pac.otrosJson.antecTransmisiblesOtro}
+                               </span>
+                             )}
+                          </div>
+                       </div>
+                    </div>
                   </div>
               )
             })}

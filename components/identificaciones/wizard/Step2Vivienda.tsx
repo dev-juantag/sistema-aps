@@ -9,6 +9,8 @@ import {
 import { inp, sel, card, cardBorder, lbl, lblStyle, required as reqStyle, chk, chkLabel, sectionTitle, sectionTitleStyle } from './wizardStyles'
 import { useEffect } from 'react'
 
+import { F, Multi } from './wizardComponents'
+
 export default function Step2Vivienda() {
   const { register, watch, setValue, getValues } = useFormContext()
   const tipoVivienda = watch('tipoVivienda')
@@ -166,31 +168,5 @@ function Sec({ title, children }: { title: string; children: React.ReactNode }) 
       <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#081e69' }}>{title}</p>
       {children}
     </div>
-  )
-}
-
-function F({ label, children, required, className }: { label: string; children: React.ReactNode; required?: boolean; className?: string }) {
-  return (
-    <div className={`space-y-1 ${className || ''}`}>
-      <label className={lbl} style={lblStyle}>
-        {label} {required && <span style={reqStyle}>*</span>}
-      </label>
-      {children}
-    </div>
-  )
-}
-
-function Multi({ label, options, name, register, required }: { label: string; options: {id: number; label: string}[]; name: string; register: any, required?: boolean }) {
-  return (
-    <F label={label} required={required}>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 mt-1">
-        {options.map(o => (
-          <label key={o.id} className={chkLabel}>
-            <input type="checkbox" value={o.id} {...register(name)} className={chk} />
-            <span className="text-xs leading-tight">{o.label}</span>
-          </label>
-        ))}
-      </div>
-    </F>
   )
 }

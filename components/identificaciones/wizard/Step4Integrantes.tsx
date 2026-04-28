@@ -8,6 +8,7 @@ import {
   REGIMEN_SALUD, ETNIA, GRUPO_POBLACIONAL, DISCAPACIDADES, BARRERAS_ACCESO, calcularEdad, calcularCursoVida
 } from '@/lib/constants'
 import { inp, sel, lbl, lblStyle, required as reqStyle, chk, chkLabel, btnGreen, btnGreenStyle } from './wizardStyles'
+import { F, Multi } from './wizardComponents'
 
 const defaultIntegrante = {
   primerNombre: '', segundoNombre: '', primerApellido: '', segundoApellido: '',
@@ -248,36 +249,24 @@ export default function Step4Integrantes() {
                       <input {...register(`integrantes.${i}.puebloIndigena`)} className={inp} placeholder="Nombre del pueblo" />
                     </F>
                   )}
-                  <F label="Grupo Pob. Especial Protección (múltiple)">
-                    <div className="grid grid-cols-2 gap-1 mt-1">
-                      {GRUPO_POBLACIONAL.map(o => (
-                        <label key={o.id} className={chkLabel}>
-                          <input type="checkbox" value={o.id} {...register(`integrantes.${i}.grupoPoblacional`)} className={chk} />
-                          <span className="text-xs leading-tight">{o.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </F>
-                  <F label="Barreras de Acceso (múltiple)">
-                    <div className="grid grid-cols-2 gap-1 mt-1">
-                      {BARRERAS_ACCESO.map(o => (
-                        <label key={o.id} className={chkLabel}>
-                          <input type="checkbox" value={o.id} {...register(`integrantes.${i}.barrerasAcceso`)} className={chk} />
-                          <span className="text-xs leading-tight">{o.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </F>
-                  <F label="Discapacidades (múltiple)">
-                    <div className="grid grid-cols-2 gap-1 mt-1">
-                      {DISCAPACIDADES.map(o => (
-                        <label key={o.id} className={chkLabel}>
-                          <input type="checkbox" value={o.id} {...register(`integrantes.${i}.discapacidades`)} className={chk} />
-                          <span className="text-xs leading-tight">{o.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </F>
+                  <Multi 
+                    label="Grupo Pob. Especial Protección (múltiple)" 
+                    options={GRUPO_POBLACIONAL} 
+                    name={`integrantes.${i}.grupoPoblacional`} 
+                    register={register} 
+                  />
+                  <Multi 
+                    label="Barreras de Acceso (múltiple)" 
+                    options={BARRERAS_ACCESO} 
+                    name={`integrantes.${i}.barrerasAcceso`} 
+                    register={register} 
+                  />
+                  <Multi 
+                    label="Discapacidades (múltiple)" 
+                    options={DISCAPACIDADES} 
+                    name={`integrantes.${i}.discapacidades`} 
+                    register={register} 
+                  />
                 </div>
 
               </div>
@@ -289,13 +278,4 @@ export default function Step4Integrantes() {
   )
 }
 
-function F({ label, children, required, className }: { label: string; children: React.ReactNode; required?: boolean; className?: string }) {
-  return (
-    <div className={`space-y-1 ${className || ''}`}>
-      <label className={lbl} style={lblStyle}>
-        {label} {required && <span style={reqStyle}>*</span>}
-      </label>
-      {children}
-    </div>
-  )
-}
+
