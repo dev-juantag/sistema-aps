@@ -23,6 +23,14 @@ export async function GET(
           }
         },
         territorio: true,
+        seguimientos: {
+          include: {
+            responsable: {
+              select: { nombre: true, apellidos: true, rol: true }
+            }
+          },
+          orderBy: { fecha: 'asc' }
+        },
         pacientes: {
           include: {
             atenciones: {

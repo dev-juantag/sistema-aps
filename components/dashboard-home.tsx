@@ -121,7 +121,7 @@ export function DashboardHome() {
   )
   const { data: terrsData, error: errTerr } = useSWR("/api/territorios", fetcher, swrOptions)
   const { data: idStats } = useSWR(
-    shouldFetchIdData ? `/api/identificaciones/stats?role=${user?.rol}&territorioId=${tIds}` : null,
+    shouldFetchIdData ? `/api/identificaciones/stats?role=${user?.rol}&territorioId=${tIds}&filterMode=todo` : null,
     fetcher,
     swrOptions
   )
@@ -413,14 +413,8 @@ export function DashboardHome() {
           color: "bg-primary/10 text-primary",
         },
         {
-          label: "Sin Aseguramiento",
-          value: idStats?.kpis?.sinAseguramiento || 0,
-          icon: <ShieldAlert className="h-5 w-5" />,
-          color: "bg-orange-100 text-orange-600",
-        },
-        {
-          label: "Remisiones APS",
-          value: idStats?.kpis?.remitidos || 0,
+          label: "Seguimientos Familiares",
+          value: idStats?.kpis?.seguimientosEtapa || 0,
           icon: <Activity className="h-5 w-5" />,
           color: "bg-rose-100 text-rose-600",
         },
@@ -516,7 +510,7 @@ export function DashboardHome() {
       </div>
 
       {/* KPI Cards */}
-      <div className={`grid gap-4 ${isAdmin ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
+      <div className={`grid gap-4 ${isAdmin ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
         {kpis.map((kpi) => (
           <div
             key={kpi.label}
@@ -567,50 +561,50 @@ export function DashboardHome() {
 
           {(isAdmin || isEnfermeraJefe) && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-               <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-destructive/30">
-                 <div className="flex items-center justify-between mb-2">
-                   <ShieldAlert className="h-5 w-5 text-destructive" />
-                   <span className="text-[10px] font-bold px-2 py-0.5 bg-destructive/10 text-destructive rounded-full">ALERTA</span>
-                 </div>
-                 <p className="text-2xl font-bold text-foreground">{idStats?.kpis?.victimas || 0}</p>
-                 <p className="text-xs text-muted-foreground font-medium">Víctimas del Conflicto</p>
-                 <div className="absolute -bottom-2 -right-2 h-12 w-12 text-destructive/5 group-hover:text-destructive/10 transition-colors">
-                    <ShieldAlert className="h-full w-full" />
-                 </div>
-               </div>
+              <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-destructive/30">
+                <div className="flex items-center justify-between mb-2">
+                  <ShieldAlert className="h-5 w-5 text-destructive" />
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-destructive/10 text-destructive rounded-full">VULNERABILIDAD</span>
+                </div>
+                <p className="text-2xl font-bold text-foreground">{idStats?.kpis?.victimas || 0}</p>
+                <p className="text-xs text-muted-foreground font-medium">Víctimas del Conflicto</p>
+                <div className="absolute -bottom-2 -right-2 h-12 w-12 text-destructive/5 group-hover:text-destructive/10 transition-colors">
+                  <ShieldAlert className="h-full w-full" />
+                </div>
+              </div>
 
-               <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-blue-500/30">
-                 <div className="flex items-center justify-between mb-2">
-                   <Accessibility className="h-5 w-5 text-blue-500" />
-                   <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full">INCLUSIÓN</span>
-                 </div>
-                 <p className="text-2xl font-bold text-foreground">{idStats?.kpis?.conDiscapacidad || 0}</p>
-                 <p className="text-xs text-muted-foreground font-medium">PcD (Discapacidad)</p>
-                 <div className="absolute -bottom-2 -right-2 h-12 w-12 text-blue-500/5 group-hover:text-blue-500/10 transition-colors">
-                    <Accessibility className="h-full w-full" />
-                 </div>
-               </div>
+              <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-blue-500/30">
+                <div className="flex items-center justify-between mb-2">
+                  <Accessibility className="h-5 w-5 text-blue-500" />
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full">INCLUSIÓN</span>
+                </div>
+                <p className="text-2xl font-bold text-foreground">{idStats?.kpis?.conDiscapacidad || 0}</p>
+                <p className="text-xs text-muted-foreground font-medium">PcD (Discapacidad)</p>
+                <div className="absolute -bottom-2 -right-2 h-12 w-12 text-blue-500/5 group-hover:text-blue-500/10 transition-colors">
+                  <Accessibility className="h-full w-full" />
+                </div>
+              </div>
 
-               <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-rose-500/30">
-                 <div className="flex items-center justify-between mb-2">
-                   <HeartPulse className="h-5 w-5 text-rose-500" />
-                   <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-600 rounded-full">ALTA PRIORIDAD</span>
-                 </div>
-                 <p className="text-2xl font-bold text-foreground">{idStats?.kpis?.hogaresHuerfanas || 0}</p>
-                 <p className="text-xs text-muted-foreground font-medium">Enf. Huérfana o Terminal</p>
-                 <p className="text-[9px] text-muted-foreground italic mt-1">(Familias con casos)</p>
-               </div>
+              <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-rose-500/30">
+                <div className="flex items-center justify-between mb-2">
+                  <HeartPulse className="h-5 w-5 text-rose-500" />
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-600 rounded-full">ALTA PRIORIDAD</span>
+                </div>
+                <p className="text-2xl font-bold text-foreground">{idStats?.kpis?.hogaresHuerfanas || 0}</p>
+                <p className="text-xs text-muted-foreground font-medium">Enf. Huérfana o Terminal</p>
+                <p className="text-[9px] text-muted-foreground italic mt-1">(Familias con casos)</p>
+              </div>
 
-               <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-emerald-500/30">
-                 <div className="flex items-center justify-between mb-2">
-                   <Heart className="h-5 w-5 text-emerald-500" />
-                   <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded-full">PROTECCIÓN</span>
-                 </div>
-                 <p className="text-2xl font-bold text-emerald-600">
-                   {idStats?.aseguramiento?.regimen?.find((r: any) => r.name === "SUBSIDIADO")?.value || 0}
-                 </p>
-                 <p className="text-xs text-muted-foreground font-medium">Régimen Subsidiado</p>
-               </div>
+              <div className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-emerald-500/30">
+                <div className="flex items-center justify-between mb-2">
+                  <Heart className="h-5 w-5 text-emerald-500" />
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded-full">PROTECCIÓN</span>
+                </div>
+                <p className="text-2xl font-bold text-emerald-600">
+                  {idStats?.kpis?.regimenSubsidiado || 0}
+                </p>
+                <p className="text-xs text-muted-foreground font-medium">Régimen Subsidiado</p>
+              </div>
             </div>
           )}
 

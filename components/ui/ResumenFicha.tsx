@@ -1,4 +1,4 @@
-import { ArrowLeft, Printer, MapPin, Info, Home, Users, Activity, Stethoscope, FileText, Network, Edit, Phone } from 'lucide-react'
+import { ArrowLeft, Printer, MapPin, Info, Home, Users, Activity, Stethoscope, FileText, Network, Edit, Phone, Plus } from 'lucide-react'
 import { 
   ESTADO_VISITA, APGAR_OPCIONES, calcularEdad, 
   FUENTE_AGUA, DISPOSICION_EXCRETAS, AGUAS_RESIDUALES, 
@@ -14,6 +14,7 @@ import useSWR from "swr"
 import { fetcher } from "@/lib/fetcher"
 import { FamiliogramaGlobalEditor } from '../familiograma-global-editor'
 import FamiliogramaStaticViewer from './FamiliogramaStaticViewer'
+import { toast } from 'sonner'
 
 export default function ResumenFicha({ 
   ficha, onClose, onStartNew, onEnableUpdate, onGoToEdit, onRefreshFicha 
@@ -24,6 +25,10 @@ export default function ResumenFicha({
   onRefreshFicha?: () => void
 }) {
   const [showFamiliograma, setShowFamiliograma] = useState(false)
+  const [showSeguimientoModal, setShowSeguimientoModal] = useState(false)
+  const [segObservacion, setSegObservacion] = useState('')
+  const [segAcuerdos, setSegAcuerdos] = useState(false)
+  const [isSubmittingSeg, setIsSubmittingSeg] = useState(false)
   const { user, isSuperAdmin, isAdmin } = useAuth()
   const { data: rawProgramas } = useSWR("/api/programas", fetcher)
   
@@ -520,6 +525,68 @@ export default function ResumenFicha({
           </div>
         )}
 
+        {/* SEGUIMIENTOS FAMILIARES */}
+        {ficha.estadoVisita === '1' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-gray-800">Seguimientos Familiares</h2>
+                  <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Evolución y Novedades</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setSegObservacion('')
+                  setSegAcuerdos(false)
+                  setShowSeguimientoModal(true)
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white text-sm font-bold rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Añadir seguimiento a la familia
+              </button>
+            </div>
+            
+            {ficha.seguimientos && ficha.seguimientos.length > 0 ? (
+              <div className="space-y-4">
+                {ficha.seguimientos.map((seg: any) => (
+                  <div key={seg.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50/50">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-teal-100 text-teal-800 text-[10px] px-2 py-0.5 rounded font-black tracking-widest uppercase">
+                          Seguimiento N° {seg.consecutivo}
+                        </span>
+                        <span className="text-xs text-gray-500 font-medium">
+                          {new Date(seg.fecha).toLocaleDateString('es-CO')}
+                        </span>
+                      </div>
+                      {seg.acuerdosCumplidos ? (
+                         <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold uppercase">Acuerdos Cumplidos</span>
+                      ) : (
+                         <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-bold uppercase">Pendiente</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-700 mb-2 whitespace-pre-line">{seg.observacion}</p>
+                    <p className="text-[10px] text-gray-400 uppercase font-black">
+                      Por: {seg.responsable?.nombre} {seg.responsable?.apellidos} ({seg.responsable?.rol})
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center p-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                 <p className="text-gray-500 font-medium text-center">
+                   Aún no se han registrado seguimientos para esta familia.
+                 </p>
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
 
       {showFamiliograma && ficha?.id && (
@@ -530,6 +597,80 @@ export default function ResumenFicha({
             if (onRefreshFicha) onRefreshFicha()
           }} 
         />
+      )}
+
+      {showSeguimientoModal && (
+        <div 
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto"
+          onClick={(e) => { if(e.target === e.currentTarget) setShowSeguimientoModal(false) }}
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl relative animate-in zoom-in-95 duration-200">
+            <h2 className="text-xl font-black text-gray-800 mb-4">Añadir Seguimiento N° {(ficha.seguimientos?.length || 0) + 1}</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-black text-gray-500 uppercase mb-2">Observación de Novedades</label>
+                <textarea 
+                  rows={4} 
+                  className="w-full p-3 border rounded-lg text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all"
+                  placeholder="Registrar cambios en salud, nuevos diagnósticos o situaciones sociales..."
+                  value={segObservacion}
+                  onChange={e => setSegObservacion(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  id="acuerdosCumplidos" 
+                  className="w-4 h-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
+                  checked={segAcuerdos}
+                  onChange={e => setSegAcuerdos(e.target.checked)}
+                />
+                <label htmlFor="acuerdosCumplidos" className="text-sm font-bold text-gray-700 cursor-pointer">
+                  Los compromisos pactados se cumplieron
+                </label>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button 
+                onClick={() => setShowSeguimientoModal(false)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-bold transition-colors"
+                disabled={isSubmittingSeg}
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={async () => {
+                  if (!user) return toast.error("Usuario no autenticado");
+                  setIsSubmittingSeg(true);
+                  const toastId = toast.loading("Guardando seguimiento...");
+                  try {
+                    const res = await fetch(`/api/identificaciones/${ficha.id}/seguimientos`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        observacion: segObservacion,
+                        acuerdosCumplidos: segAcuerdos,
+                        responsableId: user.id
+                      })
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                    toast.success("Seguimiento añadido correctamente", { id: toastId });
+                    setShowSeguimientoModal(false);
+                    if (onRefreshFicha) onRefreshFicha();
+                  } catch (e: any) {
+                    toast.error(e.message || "Error guardando", { id: toastId });
+                  } finally {
+                    setIsSubmittingSeg(false);
+                  }
+                }}
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold transition-colors disabled:opacity-50"
+                disabled={isSubmittingSeg || !segObservacion.trim()}
+              >
+                {isSubmittingSeg ? 'Guardando...' : 'Guardar Seguimiento'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

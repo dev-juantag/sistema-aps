@@ -92,17 +92,11 @@ export function AdminReportesId() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <KPICard title="Total Pacientes" value={kpis.totalPacientes} icon={<Users className="w-4 h-4" />} color="#081e69" />
+        <KPICard title="Subsidiado" value={kpis.regimenSubsidiado} icon={<HeartPulse className="w-4 h-4" />} color="#10b981" />
+        <KPICard title="Contributivo" value={kpis.regimenContributivo} icon={<Stethoscope className="w-4 h-4" />} color="#3b82f6" />
+        <KPICard title="Sin Afiliación" value={kpis.sinAseguramiento} icon={<ShieldAlert className="w-4 h-4" />} color="#ef4444" />
         <KPICard title="Gestantes" value={kpis.gestantes} icon={<HeartPulse className="w-4 h-4" />} color="#eb3b5a" />
-        <KPICard 
-          title="Niños < 10" 
-          value={kpis.menores10} 
-          icon={<Baby className="w-4 h-4" />} 
-          color="#0fb9b1" 
-          subtitle={(kpis?.ninosDesnutricion || 0) > 0 ? <span className="text-orange-600 bg-orange-100/50 px-2 py-0.5 rounded-full flex items-center gap-1"><AlertTriangle className="h-3 w-3"/> {kpis.ninosDesnutricion} con riesgo</span> : null}
-        />
-        <KPICard title="Adulto Mayor" value={kpis.mayores60} icon={<Activity className="w-4 h-4" />} color="#fa8231" />
-        <KPICard title="Discapacidad" value={kpis.conDiscapacidad} icon={<Accessibility className="w-4 h-4" />} color="#8854d0" />
-        <KPICard title="Cumple 3280" value={`${Math.round((kpis.cumpleEsquema / (kpis.totalPacientes || 1)) * 100)}%`} icon={<ShieldAlert className="w-4 h-4" />} color="#09753d" />
+        <KPICard title="Seguimientos" value={kpis.seguimientosEtapa} icon={<Activity className="w-4 h-4" />} color="#8854d0" />
       </div>
 
       {/* Tabs */}

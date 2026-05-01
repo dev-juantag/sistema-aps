@@ -59,6 +59,7 @@ model User {
   territoriosAsignados  Territorio[]              @relation("FacturadorTerritorios")
   programa              Programa?                 @relation(fields: [programaId], references: [id])
   territorio            Territorio?               @relation("UserSingleTerritorio", fields: [territorioId], references: [id])
+  seguimientosRealizados SeguimientoFamiliar[]
 }
 
 model Contrato {
@@ -164,6 +165,7 @@ model FichaHogar {
   encuestador           User?        @relation(fields: [encuestadorId], references: [id])
   territorio            Territorio?  @relation(fields: [territorioId], references: [id])
   pacientes             Paciente[]
+  seguimientos          SeguimientoFamiliar[]
 }
 
 model Paciente {
@@ -300,4 +302,19 @@ enum EstadoFacturacion {
   EVOLUCIONADA_SAFIX
   GLOSADA
   PAGADA
+}
+
+model SeguimientoFamiliar {
+  id                String       @id @default(uuid())
+  fichaId           String
+  observacion       String
+  acuerdosCumplidos Boolean      @default(false)
+  consecutivo       Int
+  responsableId     String
+  fecha             DateTime     @default(now())
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @default(now()) @updatedAt
+
+  ficha             FichaHogar   @relation(fields: [fichaId], references: [id], onDelete: Cascade)
+  responsable       User         @relation(fields: [responsableId], references: [id])
 }

@@ -34,7 +34,8 @@ import {
   Heart,
   Briefcase,
   Layers,
-  Home
+  Home,
+  Stethoscope
 } from "lucide-react"
 import { CONFIG } from "@/lib/config"
 
@@ -274,30 +275,21 @@ export function AdminReportes() {
             {/* Pie Chart */}
             <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
               <div className="mb-6 flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold text-foreground">Distribución Institucional</h2>
+                <Map className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold text-foreground">Atenciones por Territorio</h2>
               </div>
               <div className="h-80">
-                {pieAtenciones.length === 0 ? (
+                {facturacionStats.filter(t => t.total > 0).length === 0 ? (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground text-sm">Sin registros</div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieAtenciones}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={70}
-                        outerRadius={100}
-                        paddingAngle={5}
-                        dataKey="value"
-                        labelLine={false}
-                      >
-                        {pieAtenciones.map((_, i) => <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
+                    <BarChart data={facturacionStats.filter(t => t.total > 0).slice(0, 10)} margin={{ top: 5, right: 10, left: -10, bottom: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.90 0.02 285)" />
+                      <XAxis dataKey="nombre" tick={{ fontSize: 10 }} angle={-40} textAnchor="end" height={80} interval={0} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip contentStyle={{ backgroundColor: "var(--card)", borderRadius: "12px", border: "1px solid var(--border)" }} />
+                      <Bar dataKey="total" name="Atenciones" fill="oklch(0.60 0.15 200)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
                   </ResponsiveContainer>
                 )}
               </div>
@@ -438,95 +430,92 @@ export function AdminReportes() {
       {!loading && activeTab === "identificaciones" && idStats && (
         <div className="flex flex-col gap-6">
           {/* Main Indicators Grid */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="p-3 bg-blue-100 text-blue-600 rounded-xl"><Home className="h-6 w-6" /></div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4 mb-6">
+            <div className="bg-card border border-border p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+               <div className="flex items-center justify-between mb-3">
+                 <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl"><Home className="h-5 w-5" /></div>
                  <span className="text-[10px] text-blue-600 font-black uppercase">Consolidado</span>
                </div>
-               <p className="text-sm text-muted-foreground font-medium mb-1">Total Hogares</p>
-               <h3 className="text-4xl font-black text-foreground tabular-nums">{idStats?.kpis?.totalFichas || 0}</h3>
-               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-blue-500/5 group-hover:text-blue-500/10 transition-colors"><Home className="h-full w-full" /></div>
+               <p className="text-xs text-muted-foreground font-medium mb-0.5">Total Hogares</p>
+               <h3 className="text-3xl font-black text-foreground tabular-nums">{idStats?.kpis?.totalFichas || 0}</h3>
+               <div className="absolute -right-4 -bottom-4 h-20 w-20 text-blue-500/5 group-hover:text-blue-500/10 transition-colors"><Home className="h-full w-full" /></div>
             </div>
 
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl"><Users className="h-6 w-6" /></div>
+            <div className="bg-card border border-border p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+               <div className="flex items-center justify-between mb-3">
+                 <div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl"><Users className="h-5 w-5" /></div>
                  <span className="text-[10px] text-indigo-600 font-black uppercase">Población</span>
                </div>
-               <p className="text-sm text-muted-foreground font-medium mb-1">Total Personas</p>
-               <h3 className="text-4xl font-black text-foreground tabular-nums">{idStats?.kpis?.totalPacientes || 0}</h3>
-               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-indigo-500/5 group-hover:text-indigo-500/10 transition-colors"><Users className="h-full w-full" /></div>
+               <p className="text-xs text-muted-foreground font-medium mb-0.5">Total Personas</p>
+               <h3 className="text-3xl font-black text-foreground tabular-nums">{idStats?.kpis?.totalPacientes || 0}</h3>
+               <div className="absolute -right-4 -bottom-4 h-20 w-20 text-indigo-500/5 group-hover:text-indigo-500/10 transition-colors"><Users className="h-full w-full" /></div>
             </div>
 
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="p-3 bg-rose-100 text-rose-600 rounded-xl"><Activity className="h-6 w-6" /></div>
-                 <span className="text-[10px] text-rose-600 font-black uppercase">Materno</span>
+            <div className="bg-card border border-border p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+               <div className="flex items-center justify-between mb-3">
+                 <div className="p-2.5 bg-rose-100 text-rose-600 rounded-xl"><HeartPulse className="h-5 w-5" /></div>
+                 <span className="text-[10px] text-rose-600 font-black uppercase">Maternidad</span>
                </div>
-               <p className="text-sm text-muted-foreground font-medium mb-1">Total Gestantes</p>
-               <h3 className="text-4xl font-black text-foreground tabular-nums">{idStats?.kpis?.gestantes || 0}</h3>
-               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-rose-500/5 group-hover:text-rose-500/10 transition-colors"><Activity className="h-full w-full" /></div>
+               <p className="text-xs text-muted-foreground font-medium mb-0.5">Gestantes Activas</p>
+               <h3 className="text-3xl font-black text-foreground tabular-nums">{idStats?.kpis?.gestantes || 0}</h3>
+               <div className="absolute -right-4 -bottom-4 h-20 w-20 text-rose-500/5 group-hover:text-rose-500/10 transition-colors"><HeartPulse className="h-full w-full" /></div>
             </div>
 
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="p-3 bg-amber-100 text-amber-600 rounded-xl"><Accessibility className="h-6 w-6" /></div>
-                 <span className="text-[10px] text-amber-600 font-black uppercase">Inclusión</span>
+            <div className="bg-card border border-border p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+               <div className="flex items-center justify-between mb-3">
+                 <div className="p-2.5 bg-orange-100 text-orange-600 rounded-xl"><Activity className="h-5 w-5" /></div>
+                 <span className="text-[10px] text-orange-600 font-black uppercase">Vejez</span>
                </div>
-               <p className="text-sm text-muted-foreground font-medium mb-1">PcD (Discapacidad)</p>
-               <h3 className="text-4xl font-black text-foreground tabular-nums">
-                 {idStats?.kpis?.conDiscapacidad || 0}
-               </h3>
-               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-amber-500/5 group-hover:text-amber-500/10 transition-colors"><Accessibility className="h-full w-full" /></div>
+               <p className="text-xs text-muted-foreground font-medium mb-0.5">Adulto Mayor (60+)</p>
+               <h3 className="text-3xl font-black text-foreground tabular-nums">{idStats?.kpis?.mayores60 || 0}</h3>
+               <div className="absolute -right-4 -bottom-4 h-20 w-20 text-orange-500/5 group-hover:text-orange-500/10 transition-colors"><Activity className="h-full w-full" /></div>
             </div>
 
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="p-3 bg-teal-100 text-teal-600 rounded-xl"><Baby className="h-6 w-6" /></div>
+            <div className="bg-card border border-border p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+               <div className="flex items-center justify-between mb-3">
+                 <div className="p-2.5 bg-teal-100 text-teal-600 rounded-xl"><Baby className="h-5 w-5" /></div>
                  <span className="text-[10px] text-teal-600 font-black uppercase">Infancia</span>
                </div>
-               <p className="text-sm text-muted-foreground font-medium mb-1">Niños &lt; 10 años</p>
-               <h3 className="text-4xl font-black text-foreground tabular-nums flex items-baseline gap-2">
-                 {idStats?.kpis?.menores10 || 0}
-                 {(idStats?.kpis?.ninosDesnutricion || 0) > 0 && (
-                   <span className="text-sm font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full flex items-center gap-1 leading-none shadow-sm pb-1">
-                     <AlertTriangle className="h-3 w-3" />
-                     {idStats.kpis.ninosDesnutricion} con riesgo
+               <p className="text-xs text-muted-foreground font-medium mb-0.5">Niños &lt; 10 años</p>
+               <div className="flex items-baseline gap-2">
+                 <h3 className="text-3xl font-black text-foreground tabular-nums">{idStats?.kpis?.menores10 || 0}</h3>
+                 {idStats?.kpis?.ninosDesnutricion > 0 && (
+                   <span className="text-[10px] font-black text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-lg border border-rose-100">
+                     {idStats.kpis.ninosDesnutricion} riesgo
                    </span>
                  )}
-               </h3>
-               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-teal-500/5 group-hover:text-teal-500/10 transition-colors"><Baby className="h-full w-full" /></div>
+               </div>
+               <div className="absolute -right-4 -bottom-4 h-20 w-20 text-teal-500/5 group-hover:text-teal-500/10 transition-colors"><Baby className="h-full w-full" /></div>
             </div>
 
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="p-3 bg-gray-100 text-gray-600 rounded-xl"><Users className="h-6 w-6" /></div>
-                 <span className="text-[10px] text-gray-600 font-black uppercase">Vejez</span>
+            <div className="bg-card border border-border p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+               <div className="flex items-center justify-between mb-3">
+                 <div className="p-2.5 bg-destructive/10 text-destructive rounded-xl"><Users className="h-5 w-5" /></div>
+                 <span className="text-[10px] text-destructive font-black uppercase">Dinámica</span>
                </div>
-               <p className="text-sm text-muted-foreground font-medium mb-1">Adultos (60+)</p>
-               <h3 className="text-4xl font-black text-foreground tabular-nums">{idStats?.kpis?.mayores60 || 0}</h3>
-               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-gray-500/5 group-hover:text-gray-500/10 transition-colors"><Users className="h-full w-full" /></div>
+               <p className="text-xs text-muted-foreground font-medium mb-0.5">Disfunción APGAR</p>
+               <h3 className="text-3xl font-black text-destructive tabular-nums">{idStats?.kpis?.apgarDisfuncion || 0}</h3>
+               <div className="absolute -right-4 -bottom-4 h-20 w-20 text-destructive/5 group-hover:text-destructive/10 transition-colors"><Users className="h-full w-full" /></div>
             </div>
 
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="p-3 bg-red-100 text-red-600 rounded-xl"><ShieldAlert className="h-6 w-6" /></div>
-                 <span className="text-[10px] text-red-600 font-black uppercase">Alerta</span>
+            <div className="bg-card border border-border p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+               <div className="flex items-center justify-between mb-3">
+                 <div className="p-2.5 bg-teal-100 text-teal-600 rounded-xl"><FileText className="h-5 w-5" /></div>
+                 <span className="text-[10px] text-teal-600 font-black uppercase">Gestión</span>
                </div>
-               <p className="text-sm text-muted-foreground font-medium mb-1">Sin Aseguramiento</p>
-               <h3 className="text-4xl font-black text-foreground tabular-nums">{idStats?.kpis?.sinAseguramiento || 0}</h3>
-               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-red-500/5 group-hover:text-red-500/10 transition-colors"><ShieldAlert className="h-full w-full" /></div>
+               <p className="text-xs text-muted-foreground font-medium mb-0.5">Pers. Remitidas</p>
+               <h3 className="text-3xl font-black text-foreground tabular-nums">{idStats?.kpis?.remitidos || 0}</h3>
+               <div className="absolute -right-4 -bottom-4 h-20 w-20 text-teal-500/5 group-hover:text-teal-500/10 transition-colors"><FileText className="h-full w-full" /></div>
             </div>
 
-            <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="p-3 bg-purple-100 text-purple-600 rounded-xl"><HeartPulse className="h-6 w-6" /></div>
-                 <span className="text-[10px] text-purple-600 font-black uppercase">Acción</span>
+            <div className="bg-card border border-border p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+               <div className="flex items-center justify-between mb-3">
+                 <div className="p-2.5 bg-purple-100 text-purple-600 rounded-xl"><HeartPulse className="h-5 w-5" /></div>
+                 <span className="text-[10px] text-purple-600 font-black uppercase">Seguimiento</span>
                </div>
-               <p className="text-sm text-muted-foreground font-medium mb-1">Remisiones APS</p>
-               <h3 className="text-4xl font-black text-foreground tabular-nums">{idStats?.kpis?.remitidos || 0}</h3>
-               <div className="absolute -right-4 -bottom-4 h-24 w-24 text-purple-500/5 group-hover:text-purple-500/10 transition-colors"><HeartPulse className="h-full w-full" /></div>
+               <p className="text-xs text-muted-foreground font-medium mb-0.5">Seguimientos Fam.</p>
+               <h3 className="text-3xl font-black text-foreground tabular-nums">{idStats?.kpis?.seguimientosEtapa || 0}</h3>
+               <div className="absolute -right-4 -bottom-4 h-20 w-20 text-purple-500/5 group-hover:text-purple-500/10 transition-colors"><HeartPulse className="h-full w-full" /></div>
             </div>
           </div>
 

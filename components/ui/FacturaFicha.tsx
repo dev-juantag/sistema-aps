@@ -335,6 +335,35 @@ export default function FacturaFicha({ ficha, autoPrint, showOnScreen }: { ficha
               <p className="italic text-gray-500 text-center py-4 border border-dashed border-gray-300">No hay integrantes registrados en esta visita.</p>
             </div>
           )}
+          {/* HISTORIAL DE SEGUIMIENTOS IMPRESO */}
+          {ficha.seguimientos && ficha.seguimientos.length > 0 && (
+            <div className={sectionCls} style={{ pageBreakInside: 'avoid' }}>
+              <h2 className={headerCls}>11. Historial de Seguimientos Familiares</h2>
+              <div className="space-y-4">
+                {ficha.seguimientos.map((seg: any) => (
+                  <div key={seg.id} className="border-b border-gray-300 pb-4 last:border-0 mb-4 last:mb-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-bold bg-gray-200 text-gray-800 text-xs px-2 py-0.5 rounded uppercase">
+                        Seguimiento N° {seg.consecutivo}
+                      </span>
+                      <span className="font-bold text-sm text-gray-800">
+                        {new Date(seg.fecha).toLocaleDateString('es-CO')}
+                      </span>
+                      <span className="text-xs font-black uppercase text-gray-500">
+                        - Resp: {seg.responsable?.nombre} {seg.responsable?.apellidos} ({seg.responsable?.rol})
+                      </span>
+                      <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ml-auto ${seg.acuerdosCumplidos ? 'bg-gray-200 text-gray-800 border border-gray-400' : 'bg-white border border-gray-400 text-gray-600'}`}>
+                        {seg.acuerdosCumplidos ? 'Acuerdos Cumplidos' : 'Pendiente'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-800 italic">
+                      &quot;{seg.observacion}&quot;
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
 

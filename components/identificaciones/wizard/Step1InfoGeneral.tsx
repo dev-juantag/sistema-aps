@@ -5,9 +5,11 @@ import { Info, MapPin, Crosshair } from 'lucide-react'
 import { ESTADO_VISITA, TIPO_DOCUMENTO_ENCUESTADOR, PERFIL_ENCUESTADOR } from '@/lib/constants'
 import { inp, sel, card, cardBorder, lbl, lblStyle, required as reqStyle, chk, chkLabel, btnGreen, btnGreenStyle } from './wizardStyles'
 import MapLocationPicker from '@/components/ui/MapLocationPicker'
+import { useAuth } from '@/lib/auth-context'
 
 export default function Step1InfoGeneral() {
   const { register, setValue, watch } = useFormContext()
+  const { isSuperAdmin } = useAuth()
 
   const handleGPS = () => {
     if (!navigator.geolocation) return
@@ -48,16 +50,16 @@ export default function Step1InfoGeneral() {
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <F label="Departamento" required>
-            <input {...register('departamento')} readOnly className={`${inp} bg-gray-100 cursor-not-allowed text-gray-600 font-bold`} />
+            <input {...register('departamento')} readOnly={!isSuperAdmin} className={`${inp} ${!isSuperAdmin ? 'bg-gray-100 cursor-not-allowed text-gray-600 font-bold' : ''}`} />
           </F>
           <F label="Municipio" required>
-            <input {...register('municipio')} readOnly className={`${inp} bg-gray-100 cursor-not-allowed text-gray-600 font-bold`} />
+            <input {...register('municipio')} readOnly={!isSuperAdmin} className={`${inp} ${!isSuperAdmin ? 'bg-gray-100 cursor-not-allowed text-gray-600 font-bold' : ''}`} />
           </F>
-          <F label="Microterritorio" required>
-            <input {...register('microterritorio')} readOnly className={`${inp} bg-gray-100 cursor-not-allowed text-gray-600 font-bold`} />
+          <F label="Territorio (Micro/Macro)" required>
+            <input {...register('microterritorio')} readOnly={!isSuperAdmin} className={`${inp} ${!isSuperAdmin ? 'bg-gray-100 cursor-not-allowed text-gray-600 font-bold' : ''}`} placeholder={isSuperAdmin ? "Ej: TER-10" : ""} />
           </F>
           <F label="UZPE">
-            <input {...register('uzpe')} placeholder="UZPE" readOnly className={`${inp} bg-gray-100 cursor-not-allowed text-gray-600 font-bold`} />
+            <input {...register('uzpe')} placeholder="UZPE" readOnly={!isSuperAdmin} className={`${inp} ${!isSuperAdmin ? 'bg-gray-100 cursor-not-allowed text-gray-600 font-bold' : ''}`} />
           </F>
           <F label="Centro Poblado / Barrio" required>
             <input {...register('centroPoblado')} placeholder="Nombre del sector" className={inp} />
@@ -109,10 +111,10 @@ export default function Step1InfoGeneral() {
         <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#081e69' }}>Responsable / Encuestador</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <F label="No. Identificación EBS" required>
-            <input {...register('numEBS')} readOnly className={`${inp} bg-gray-100 cursor-not-allowed text-gray-600 font-bold`} />
+            <input {...register('numEBS')} readOnly={!isSuperAdmin} className={`${inp} ${!isSuperAdmin ? 'bg-gray-100 cursor-not-allowed text-gray-600 font-bold' : ''}`} />
           </F>
           <F label="Prestador Primario" required>
-            <input {...register('prestadorPrimario')} readOnly className={`${inp} bg-gray-100 cursor-not-allowed text-gray-600 font-bold`} />
+            <input {...register('prestadorPrimario')} readOnly={!isSuperAdmin} className={`${inp} ${!isSuperAdmin ? 'bg-gray-100 cursor-not-allowed text-gray-600 font-bold' : ''}`} />
           </F>
           <F label="Tipo Doc. Encuestador" required>
             <select {...register('tipoDocEncuestador')} className={sel}>
@@ -121,11 +123,11 @@ export default function Step1InfoGeneral() {
             </select>
           </F>
           <F label="N° Doc. Encuestador" required>
-            <input {...register('numDocEncuestador')} readOnly className={`${inp} bg-gray-100 cursor-not-allowed text-gray-600 font-bold`} />
+            <input {...register('numDocEncuestador')} readOnly={!isSuperAdmin} className={`${inp} ${!isSuperAdmin ? 'bg-gray-100 cursor-not-allowed text-gray-600 font-bold' : ''}`} />
           </F>
           <F label="Perfil Encuestador" required className="sm:col-span-2">
-            <select {...register('perfilEncuestador')} className={`${sel} bg-gray-100 cursor-not-allowed text-gray-600 font-bold`}>
-              {PERFIL_ENCUESTADOR.filter(o => o.id === 'auxiliar').map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            <select {...register('perfilEncuestador')} className={`${sel} ${!isSuperAdmin ? 'bg-gray-100 cursor-not-allowed text-gray-600 font-bold' : ''}`}>
+              {PERFIL_ENCUESTADOR.filter(o => isSuperAdmin || o.id === 'auxiliar').map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
           </F>
           

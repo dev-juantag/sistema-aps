@@ -625,11 +625,21 @@ export function IdentificacionesModule() {
                         setIsWizardOpen(true);
                       }}
                       onEnableUpdate={async (id, current) => {
-                        await fetch(`/api/identificaciones/${id}/actualizar`, {
-                          method: 'PATCH', body: JSON.stringify({ puedeActualizarse: !current })
-                        });
-                        setSelectedFichaDetail({...selectedFichaDetail, puedeActualizarse: !current})
-                        mutateFichas()
+                        try {
+                          const res = await fetch(`/api/identificaciones/${id}/actualizar`, {
+                            method: 'PATCH', body: JSON.stringify({ puedeActualizarse: !current })
+                          });
+                          const data = await res.json();
+                          if (!res.ok) {
+                            toast.error(data.error || "Error al actualizar la autorización");
+                            return;
+                          }
+                          setSelectedFichaDetail({...selectedFichaDetail, puedeActualizarse: !current})
+                          mutateFichas()
+                          toast.success(current ? "Edición deshabilitada" : "Edición habilitada");
+                        } catch (error) {
+                          toast.error("Error de conexión");
+                        }
                       }}
                       onGoToEdit={() => {
                         setShowDetailModal(false)

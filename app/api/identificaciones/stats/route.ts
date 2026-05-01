@@ -1,5 +1,15 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { 
+  REGIMEN_SALUD, 
+  ETNIA, 
+  INTERVENCIONES_PENDIENTES, 
+  BARRERAS_ACCESO, 
+  DIAGNOSTICO_NUTRICIONAL, 
+  ANTECEDENTES_CRONICOS, 
+  ANTECEDENTES_TRANSMISIBLES, 
+  VULNERABILIDADES 
+} from "@/lib/constants"
 
 export const dynamic = "force-dynamic"
 
@@ -84,6 +94,8 @@ export async function GET(request: Request) {
 
     // 1. KPIs Generales
     let gestantes = 0
+    let subsidiado = 0
+    let contributivo = 0
     let menores5 = 0
     let menores10 = 0
     let mayores60 = 0
@@ -97,6 +109,7 @@ export async function GET(request: Request) {
     let totalHombres = 0
     let totalMujeres = 0
     let enfermedadHuerfanaHogares = new Set<string>()
+    let apgarDisfuncion = 0
 
     // 2. Pirámide Poblacional - Cursos de Vida
     const piramideMap: Record<string, { hombres: number, mujeres: number, label: string, sort: number }> = {
@@ -150,6 +163,10 @@ export async function GET(request: Request) {
           }
         })
       }
+      // APGAR
+      if (f.apgar && f.apgar > 1) {
+        apgarDisfuncion++
+      }
       
       const nom = f.territorio?.nombre || "Sin Asignar"
       densidadMap[nom] = (densidadMap[nom] || 0) + 1
@@ -170,8 +187,17 @@ export async function GET(request: Request) {
       if (p.remisiones && p.remisiones.length > 0) remitidos++
 
       // Aseguramiento
-      if (!p.regimen || p.regimen === "" || p.regimen === "SIN AFILIACION") {
+      let regRaw = p.regimen && p.regimen.trim() !== "" ? p.regimen.trim().toUpperCase() : "NO_AFILIADO"
+      let reg = regRaw.replace(/\s+/g, '_')
+      if (reg === "SIN_AFILIACION" || reg === "SIN_AFILIACIÓN" || reg === "NO_TIENE") reg = "NO_AFILIADO"
+      
+      regimenMap[reg] = (regimenMap[reg] || 0) + 1
+      if (reg === "NO_AFILIADO") {
         sinAseguramiento++
+      } else if (reg === "SUBSIDIADO") {
+        subsidiado++
+      } else if (reg === "CONTRIBUTIVO") {
+        contributivo++
       }
       
       let currentAge = -1
@@ -199,10 +225,6 @@ export async function GET(request: Request) {
           else if (p.sexo === "MUJER") piramideMap[rango].mujeres++
         }
       }
-
-      // Aseguramiento Map
-      if (p.regimen) regimenMap[p.regimen] = (regimenMap[p.regimen] || 0) + 1
-      if (p.eapb) eapbMap[p.eapb] = (eapbMap[p.eapb] || 0) + 1
 
       // Etnia
       if (p.etnia) etniaMap[p.etnia] = (etniaMap[p.etnia] || 0) + 1
@@ -250,6 +272,45 @@ export async function GET(request: Request) {
 
     // Preparar Densidad Map - Ya se hace en fichas.forEach
 
+    // 9. Seguimientos
+    let whereSeguimiento: any = {}
+    let whereSeguimientoEtapa: any = {}
+    
+    if (territorioId) {
+      if (territorioId.includes(',')) {
+        whereSeguimiento.ficha = { territorioId: { in: territorioId.split(',') } }
+        whereSeguimientoEtapa.ficha = { territorioId: { in: territorioId.split(',') } }
+      } else {
+        whereSeguimiento.ficha = { territorioId: territorioId }
+        whereSeguimientoEtapa.ficha = { territorioId: territorioId }
+      }
+    }
+
+    const settings = await prisma.systemSettings.findFirst()
+    if (settings?.currentStageStart) {
+      whereSeguimientoEtapa.fecha = { gte: settings.currentStageStart }
+    }
+
+    if (filterMode === "etapa") {
+      if (settings?.currentStageStart) {
+        whereSeguimiento.fecha = { gte: settings.currentStageStart }
+      }
+    } else if (filterMode === "fechas" && startDate && endDate) {
+      const start = new Date(startDate)
+      start.setHours(0, 0, 0, 0)
+      const end = new Date(endDate)
+      end.setHours(23, 59, 59, 999)
+      whereSeguimiento.fecha = { gte: start, lte: end }
+    }
+
+    const seguimientosCount = await prisma.seguimientoFamiliar.count({
+      where: whereSeguimiento
+    })
+
+    const seguimientosEtapaCount = await prisma.seguimientoFamiliar.count({
+      where: whereSeguimientoEtapa
+    })
+
     return NextResponse.json({
       kpis: {
         totalFichas: fichas.length,
@@ -269,25 +330,54 @@ export async function GET(request: Request) {
         ninosDesnutricion,
         habitosSaludables,
         sinAseguramiento,
+        regimenSubsidiado: subsidiado,
+        regimenContributivo: contributivo,
         remitidos,
+        apgarDisfuncion,
+        seguimientos: seguimientosCount,
+        seguimientosEtapa: seguimientosEtapaCount,
         hogaresHuerfanas: enfermedadHuerfanaHogares.size
       },
       piramide: Object.values(piramideMap).sort((a, b) => a.sort - b.sort),
       territorios: Object.entries(densidadMap).map(([name, count]) => ({ name, value: count })),
       aseguramiento: {
-        regimen: Object.entries(regimenMap).map(([name, value]) => ({ name, value })),
+        regimen: Object.entries(regimenMap).map(([name, value]) => ({ 
+          name: REGIMEN_SALUD.find(r => r.id === name)?.label || name.replace(/_/g, ' '), 
+          value 
+        })),
         eapb: Object.entries(eapbMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value).slice(0, 10)
       },
-      etnia: Object.entries(etniaMap).map(([name, value]) => ({ name, value })),
-      intervenciones: Object.entries(intervencionesMap).map(([name, value]) => ({ name, value })),
-      barreras: Object.entries(barrerasMap).map(([name, value]) => ({ name, value })),
-      nutricion: Object.entries(nutricionMap).map(([name, value]) => ({ name, value })),
+      etnia: Object.entries(etniaMap).map(([name, value]) => ({ 
+        name: ETNIA.find(e => String(e.id) === name)?.label || name.replace(/_/g, ' '), 
+        value 
+      })),
+      intervenciones: Object.entries(intervencionesMap).map(([name, value]) => ({ 
+        name: INTERVENCIONES_PENDIENTES.find(i => String(i.id) === name)?.label || name.replace(/_/g, ' '), 
+        value 
+      })),
+      barreras: Object.entries(barrerasMap).map(([name, value]) => ({ 
+        name: BARRERAS_ACCESO.find(b => String(b.id) === name)?.label || name.replace(/_/g, ' '), 
+        value 
+      })),
+      nutricion: Object.entries(nutricionMap).map(([name, value]) => ({ 
+        name: DIAGNOSTICO_NUTRICIONAL.find(d => String(d.id) === name)?.label || name.replace(/_/g, ' '), 
+        value 
+      })),
       morbilidad: {
-        cronicas: Object.entries(cronicasMap).map(([name, value]) => ({ name, value })),
-        transmisibles: Object.entries(transmisiblesMap).map(([name, value]) => ({ name, value }))
+        cronicas: Object.entries(cronicasMap).map(([name, value]) => ({ 
+          name: ANTECEDENTES_CRONICOS.find(c => c.id === name)?.label || name.replace(/_/g, ' '), 
+          value 
+        })),
+        transmisibles: Object.entries(transmisiblesMap).map(([name, value]) => ({ 
+          name: ANTECEDENTES_TRANSMISIBLES.find(t => t.id === name)?.label || name.replace(/_/g, ' '), 
+          value 
+        }))
       },
-      vulnerabilidades: Object.entries(vulnerabilidadesMap).map(([name, value]) => ({ name, value })),
-      estratos: Object.entries(estratoMap).map(([name, value]) => ({ name, value }))
+      vulnerabilidades: Object.entries(vulnerabilidadesMap).map(([name, value]) => ({ 
+        name: VULNERABILIDADES.find(v => v.id === name)?.label || name.replace(/_/g, ' '), 
+        value 
+      })),
+      estratos: Object.entries(estratoMap).map(([name, value]) => ({ name: `Estrato ${name}`, value }))
     })
 
 

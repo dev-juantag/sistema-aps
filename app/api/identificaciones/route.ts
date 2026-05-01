@@ -221,7 +221,7 @@ export async function POST(req: Request) {
       estadoVisita: String(hogarData.estadoVisita || '1'),
       departamento: String(hogarData.departamento || 'RISARALDA'),
       municipio: String(hogarData.municipio || 'PEREIRA'),
-      territorioId: String(territorio || ''), // This should match a UUID from Territorio now
+      territorioId: territorio || null,
       microterritorio: String(microterritorio || 'M1'),
       uzpe: hogarData.uzpe || null,
       centroPoblado: hogarData.centroPoblado || null,
