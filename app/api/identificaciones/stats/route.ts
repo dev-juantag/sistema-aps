@@ -56,6 +56,7 @@ export async function GET(request: Request) {
         id: true,
         estratoSocial: true,
         vulnerabilidades: true,
+        apgar: true,
         territorio: { select: { nombre: true, codigo: true } }
       }
     })
